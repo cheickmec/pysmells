@@ -1,0 +1,5 @@
+{
+  "name": "python-refactoring",
+  "description": "Python refactoring catalog with 82+ patterns. AST-based code smell detection + actionable refactoring guidance with before/after examples.",
+  "version": "1.0.0"
+}
