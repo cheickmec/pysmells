@@ -31,6 +31,95 @@ from typing import Final
 
 SEVERITY_ORDER: Final = {"info": 0, "warning": 1, "error": 2}
 
+_VALID_FAMILIES: Final = frozenset({
+    "state", "functions", "types", "control", "architecture", "hygiene", "idioms", "metrics",
+})
+_VALID_SCOPES: Final = frozenset({"file", "cross_file", "metric"})
+
+
+@dataclass(frozen=True)
+class RuleDef:
+    """Metadata for a single smellcheck rule."""
+
+    rule_id: str  # e.g. "SC701"
+    pattern_ref: str  # e.g. "057" — catalog link
+    name: str
+    family: str  # state|functions|types|control|architecture|hygiene|idioms|metrics
+    scope: str  # file|cross_file|metric
+    default_severity: str
+
+
+# fmt: off
+_RULE_REGISTRY: dict[str, RuleDef] = {
+    # --- Family 1: State & Immutability (SC1xx) ---
+    "#001": RuleDef("SC101", "001", "Remove Setters", "state", "file", "warning"),
+    "#008": RuleDef("SC102", "008", "Convert Variables to Constants", "state", "file", "info"),
+    "#009": RuleDef("SC103", "009", "Protect Public Attributes", "state", "file", "info"),
+    "#016": RuleDef("SC104", "016", "Build With The Essence", "state", "file", "warning"),
+    "#017": RuleDef("SC105", "017", "Convert Attributes to Sets", "state", "file", "info"),
+    "#024": RuleDef("SC106", "024", "Replace Global Variables with DI", "state", "file", "info"),
+    "#028": RuleDef("SC107", "028", "Replace Sequential IDs", "state", "file", "info"),
+    # --- Family 2: Functions (SC2xx) ---
+    "#002": RuleDef("SC201", "002", "Extract Method", "functions", "file", "warning"),
+    "#006": RuleDef("SC202", "006", "Rename Result Variables", "functions", "file", "info"),
+    "#026": RuleDef("SC203", "026", "Replace input() Calls", "functions", "file", "warning"),
+    "#029": RuleDef("SC204", "029", "Replace NULL with Collection", "functions", "file", "info"),
+    "#033": RuleDef("SC205", "033", "Strip Annotations", "functions", "file", "info"),
+    "#034": RuleDef("SC206", "034", "Reify Parameters", "functions", "file", "warning"),
+    "#041": RuleDef("SC207", "041", "Separate Query from Modifier", "functions", "file", "info"),
+    "#064": RuleDef("SC208", "064", "Remove Unused Parameters", "functions", "file", "warning"),
+    "#066": RuleDef("SC209", "066", "Replace Long Lambda with Function", "functions", "file", "info"),
+    "#CC":  RuleDef("SC210", "CC", "Reduce Cyclomatic Complexity", "functions", "file", "warning"),
+    "#FE":  RuleDef("SC211", "FE", "Move Method (Feature Envy)", "functions", "cross_file", "info"),
+    # --- Family 3: Types & Classes (SC3xx) ---
+    "#007": RuleDef("SC301", "007", "Extract Class", "types", "file", "info"),
+    "#014": RuleDef("SC302", "014", "Replace IF with Polymorphism", "types", "file", "warning"),
+    "#018": RuleDef("SC303", "018", "Replace Singleton", "types", "file", "warning"),
+    "#061": RuleDef("SC304", "061", "Replace Class with Dataclass", "types", "file", "info"),
+    "#062": RuleDef("SC305", "062", "Use Unpacking Instead of Indexing", "types", "file", "info"),
+    "#069": RuleDef("SC306", "069", "Remove Lazy Class", "types", "file", "info"),
+    "#070": RuleDef("SC307", "070", "Remove Temporary Field", "types", "file", "info"),
+    "#DIT": RuleDef("SC308", "DIT", "Deep Inheritance Tree", "types", "cross_file", "warning"),
+    "#WHI": RuleDef("SC309", "WHI", "Wide Hierarchy", "types", "cross_file", "info"),
+    # --- Family 4: Control Flow (SC4xx) ---
+    "#021": RuleDef("SC401", "021", "Remove Dead Code", "control", "file", "warning"),
+    "#039": RuleDef("SC402", "039", "Replace Nested Conditional with Guard Clauses", "control", "file", "warning"),
+    "#040": RuleDef("SC403", "040", "Replace Loop with Pipeline", "control", "file", "info"),
+    "#042": RuleDef("SC404", "042", "Decompose Conditional", "control", "file", "warning"),
+    "#055": RuleDef("SC405", "055", "Replace Control Flag with Break", "control", "file", "info"),
+    "#067": RuleDef("SC406", "067", "Simplify Complex Comprehension", "control", "file", "info"),
+    "#068": RuleDef("SC407", "068", "Add Default Else Branch", "control", "file", "info"),
+    # --- Family 5: Architecture (SC5xx) ---
+    "#051": RuleDef("SC501", "051", "Replace Error Codes with Exceptions", "architecture", "file", "warning"),
+    "#054": RuleDef("SC502", "054", "Law of Demeter", "architecture", "file", "info"),
+    "#CYC": RuleDef("SC503", "CYC", "Break Cyclic Import", "architecture", "cross_file", "warning"),
+    "#GOD": RuleDef("SC504", "GOD", "Split God Module", "architecture", "cross_file", "warning"),
+    "#SHO": RuleDef("SC505", "SHO", "Shotgun Surgery", "architecture", "cross_file", "info"),
+    "#INT": RuleDef("SC506", "INT", "Inappropriate Intimacy", "architecture", "cross_file", "info"),
+    "#SPG": RuleDef("SC507", "SPG", "Remove Speculative Generality", "architecture", "cross_file", "info"),
+    "#UDE": RuleDef("SC508", "UDE", "Unstable Dependency", "architecture", "cross_file", "info"),
+    # --- Family 6: Hygiene (SC6xx) ---
+    "#003": RuleDef("SC601", "003", "Extract Constant", "hygiene", "file", "info"),
+    "#004": RuleDef("SC602", "004", "Remove Unhandled Exceptions", "hygiene", "file", "error"),
+    "#036": RuleDef("SC603", "036", "Replace String Concatenation", "hygiene", "file", "info"),
+    "#063": RuleDef("SC604", "063", "Replace with contextlib", "hygiene", "file", "info"),
+    "#065": RuleDef("SC605", "065", "Remove Empty Catch Block", "hygiene", "file", "warning"),
+    "#013": RuleDef("SC606", "013", "Remove Duplicated Code", "hygiene", "cross_file", "warning"),
+    # --- Family 7: Idioms (SC7xx) ---
+    "#057": RuleDef("SC701", "057", "Replace Mutable Default Arguments", "idioms", "file", "error"),
+    "#058": RuleDef("SC702", "058", "Use Context Managers", "idioms", "file", "warning"),
+    # --- Family 8: Metrics (SC8xx) ---
+    "#LCOM": RuleDef("SC801", "LCOM", "Low Class Cohesion", "metrics", "metric", "warning"),
+    "#CBO":  RuleDef("SC802", "CBO", "High Coupling Between Objects", "metrics", "metric", "warning"),
+    "#FIO":  RuleDef("SC803", "FIO", "Excessive Fan-Out", "metrics", "metric", "info"),
+    "#RFC":  RuleDef("SC804", "RFC", "High Response for Class", "metrics", "metric", "info"),
+    "#MID":  RuleDef("SC805", "MID", "Remove Middle Man", "metrics", "metric", "info"),
+}
+# fmt: on
+
+# Reverse lookup: rule_id -> legacy pattern (e.g. "SC701" -> "#057")
+_RULE_ID_TO_LEGACY: dict[str, str] = {rd.rule_id: pat for pat, rd in _RULE_REGISTRY.items()}
+
 
 @dataclass
 class Finding:
@@ -41,6 +130,8 @@ class Finding:
     severity: str  # info | warning | error
     message: str
     category: str  # state | functions | types | control | architecture | hygiene | idioms | metrics
+    rule_id: str = ""  # e.g. "SC701" — unified SC code
+    scope: str = ""  # file | cross_file | metric
 
     @property
     def severity_rank(self) -> int:
@@ -158,11 +249,44 @@ def load_config(target: Path) -> dict:
 _NOQA_RE = re.compile(r"#\s*noqa\b(?:\s*:\s*([A-Za-z0-9_,\s]+))?")
 
 
+def _resolve_code(code: str) -> set[str]:
+    """Map any code format to legacy pattern strings used in ``_RULE_REGISTRY``.
+
+    Accepts: ``"SC701"``, ``"057"``, ``"#057"``, ``"CC"``, ``"SC057"`` (old prefix).
+    Returns a set of matching legacy patterns (e.g. ``{"#057"}``).
+    """
+    c = code.strip().upper()
+    if not c:
+        return set()
+    # New-style rule_id (e.g. SC701) or old SC-prefix with digits (e.g. SC057)
+    if c.startswith("SC") and len(c) > 2 and c[2:].isdigit():
+        # Try new rule_id first
+        pat = _RULE_ID_TO_LEGACY.get(c)
+        if pat:
+            return {pat}
+        # Fallback: old SC-prefix convention, e.g. SC057 -> #057
+        candidate = f"#{c[2:]}"
+        return {candidate} if candidate in _RULE_REGISTRY else set()
+    # Already a legacy pattern with #: "#057"
+    if c.startswith("#"):
+        return {c} if c in _RULE_REGISTRY else set()
+    # Bare ref: "057", "CC", "CYC", "LCOM"
+    candidate = f"#{c}"
+    if candidate in _RULE_REGISTRY:
+        return {candidate}
+    # Old SC-prefix with non-digit suffix: "SCCYC" -> "#CYC"
+    if c.startswith("SC"):
+        candidate = f"#{c[2:]}"
+        return {candidate} if candidate in _RULE_REGISTRY else set()
+    return set()
+
+
 def _is_suppressed(source_lines: list[str], line: int, pattern: str) -> bool:
     """Return True if *line* (1-based) has a ``# noqa`` that covers *pattern*.
 
     ``# noqa`` alone suppresses everything.
-    ``# noqa: SC057,SC003`` suppresses only the listed codes.
+    ``# noqa: SC701,SC601`` suppresses only the listed codes.
+    Both legacy (``SC057``) and new-style (``SC701``) codes are accepted.
     """
     if line < 1 or line > len(source_lines):
         return False
@@ -173,11 +297,11 @@ def _is_suppressed(source_lines: list[str], line: int, pattern: str) -> bool:
     codes_str = m.group(1)
     if codes_str is None:
         return True  # bare ``# noqa`` suppresses all
-    codes = {c.strip().upper() for c in codes_str.split(",")}
-    # Normalize pattern: "#057" -> "SC057", "#CC" -> "SCCC", "#CYC" -> "SCCYC"
-    normalized = pattern.lstrip("#")
-    sc_code = f"SC{normalized}"
-    return sc_code in codes or normalized in codes
+    # Build set of legacy patterns that the noqa line intends to suppress
+    suppressed_patterns: set[str] = set()
+    for raw_code in codes_str.split(","):
+        suppressed_patterns.update(_resolve_code(raw_code))
+    return pattern in suppressed_patterns
 
 
 # ---------------------------------------------------------------------------
@@ -386,9 +510,12 @@ class SmellDetector(ast.NodeVisitor):
         self._class_methods_fields: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
 
     def _add(self, line: int, pattern: str, name: str, severity: str, message: str, category: str):
+        rd = _RULE_REGISTRY.get(pattern)
         self.findings.append(Finding(
             file=self.filepath, line=line, pattern=pattern,
             name=name, severity=severity, message=message, category=category,
+            rule_id=rd.rule_id if rd else "",
+            scope=rd.scope if rd else "file",
         ))
 
     # =======================================================================
@@ -1436,6 +1563,24 @@ def scan_file(filepath: Path) -> tuple[list[Finding], FileData | None]:
 
 
 # ---------------------------------------------------------------------------
+# Cross-file / metric finding helper
+# ---------------------------------------------------------------------------
+
+
+def _make_finding(
+    file: str, line: int, pattern: str, name: str, severity: str, message: str, category: str,
+) -> Finding:
+    """Create a Finding enriched from the rule registry (cross-file / metric use)."""
+    rd = _RULE_REGISTRY.get(pattern)
+    return Finding(
+        file=file, line=line, pattern=pattern,
+        name=name, severity=severity, message=message, category=category,
+        rule_id=rd.rule_id if rd else "",
+        scope=rd.scope if rd else "cross_file",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Cross-file analysis (second pass) -- Original patterns
 # ---------------------------------------------------------------------------
 
@@ -1454,7 +1599,7 @@ def _detect_duplicate_functions(all_data: list[FileData]) -> list[Finding]:
             continue
         first_file, first_name, first_line, _ = group[0]
         others = [f"{Path(fp).name}:{fn}" for fp, fn, _, _ in group[1:]]
-        findings.append(Finding(
+        findings.append(_make_finding(
             file=first_file, line=first_line, pattern="#013",
             name="Remove Duplicated Code", severity="warning",
             message=f"`{first_name}` has structurally identical copies: {', '.join(others)}",
@@ -1504,7 +1649,7 @@ def _detect_cyclic_imports(all_data: list[FileData]) -> list[Finding]:
         if key in reported:
             continue
         reported.add(key)
-        findings.append(Finding(
+        findings.append(_make_finding(
             file=reverse_map.get(a, a), line=1, pattern="#CYC",
             name="Break Cyclic Import", severity="warning",
             message=f"Circular import: `{a}` <-> `{b}` -- extract shared types to break cycle",
@@ -1516,7 +1661,7 @@ def _detect_cyclic_imports(all_data: list[FileData]) -> list[Finding]:
 def _detect_god_modules(all_data: list[FileData]) -> list[Finding]:
     """#GOD -- Modules with too many top-level definitions."""
     return [
-        Finding(
+        _make_finding(
             file=fd.filepath, line=1, pattern="#GOD",
             name="Split God Module", severity="warning",
             message=f"Module has {fd.toplevel_defs} top-level definitions "
@@ -1540,7 +1685,7 @@ def _detect_feature_envy(all_data: list[FileData]) -> list[Finding]:
             for ext_class, count in external_counts.items():
                 if ext_class not in project_classes:
                     continue
-                findings.append(Finding(
+                findings.append(_make_finding(
                     file=fd.filepath, line=line, pattern="#FE",
                     name="Move Method (Feature Envy)", severity="info",
                     message=f"`{host_class}.{method_name}` accesses `{ext_class}` "
@@ -1576,7 +1721,7 @@ def _detect_shotgun_surgery(all_data: list[FileData]) -> list[Finding]:
         external_callers = callers - set(defined_in[func_name])
         if len(external_callers) > SHOTGUN_SURGERY_THRESHOLD:
             def_file = defined_in[func_name][0]
-            findings.append(Finding(
+            findings.append(_make_finding(
                 file=def_file, line=1, pattern="#SHO",
                 name="Shotgun Surgery", severity="info",
                 message=f"`{func_name}` is called from {len(external_callers)} different files "
@@ -1611,7 +1756,7 @@ def _detect_deep_inheritance(all_data: list[FileData]) -> list[Finding]:
         d = _depth(cls_name)
         if d > MAX_INHERITANCE_DEPTH:
             filepath, line = all_locations[cls_name]
-            findings.append(Finding(
+            findings.append(_make_finding(
                 file=filepath, line=line, pattern="#DIT",
                 name="Deep Inheritance Tree", severity="warning",
                 message=f"Class `{cls_name}` has inheritance depth {d} "
@@ -1637,7 +1782,7 @@ def _detect_wide_hierarchy(all_data: list[FileData]) -> list[Finding]:
         if len(subs) > MAX_DIRECT_SUBCLASSES and parent in all_locations:
             filepath, line = all_locations[parent]
             sub_names = subs[:5]
-            findings.append(Finding(
+            findings.append(_make_finding(
                 file=filepath, line=line, pattern="#WHI",
                 name="Wide Hierarchy", severity="info",
                 message=f"Class `{parent}` has {len(subs)} direct subclasses: "
@@ -1665,7 +1810,7 @@ def _detect_inappropriate_intimacy(all_data: list[FileData]) -> list[Finding]:
             a, b = sorted(pair)
             if a in class_files:
                 filepath, line = class_files[a]
-                findings.append(Finding(
+                findings.append(_make_finding(
                     file=filepath, line=line, pattern="#INT",
                     name="Inappropriate Intimacy", severity="info",
                     message=f"Classes `{a}` and `{b}` share {count} attribute accesses -- decouple or merge",
@@ -1695,7 +1840,7 @@ def _detect_speculative_generality(all_data: list[FileData]) -> list[Finding]:
         if concrete_children[abc_cls] == 0:
             for fd in all_data:
                 if abc_cls in fd.class_names:
-                    findings.append(Finding(
+                    findings.append(_make_finding(
                         file=fd.filepath, line=fd.class_lines.get(abc_cls, 1), pattern="#SPG",
                         name="Remove Speculative Generality", severity="info",
                         message=f"Abstract class `{abc_cls}` has no concrete implementations -- YAGNI?",
@@ -1733,7 +1878,7 @@ def _detect_unstable_dependency(all_data: list[FileData]) -> list[Finding]:
             dep_i = instability.get(dep, 0.0)
             if dep_i > my_i and dep_i > 0.7:
                 filepath = reverse_map[module]
-                findings.append(Finding(
+                findings.append(_make_finding(
                     file=filepath, line=1, pattern="#UDE",
                     name="Unstable Dependency", severity="info",
                     message=f"Module `{module}` (I={my_i:.2f}) depends on unstable `{dep}` (I={dep_i:.2f})",
@@ -1768,7 +1913,7 @@ def _detect_low_cohesion(all_data: list[FileData]) -> list[Finding]:
             cohesion = total_usage / max_possible
             lcom = 1.0 - cohesion
             if lcom > MAX_LCOM:
-                findings.append(Finding(
+                findings.append(_make_finding(
                     file=ci.filepath, line=ci.line, pattern="#LCOM",
                     name="Low Class Cohesion", severity="warning",
                     message=f"Class `{ci.name}` has LCOM={lcom:.2f} "
@@ -1785,7 +1930,7 @@ def _detect_high_coupling(all_data: list[FileData]) -> list[Finding]:
         for ci in fd.class_info:
             coupled_classes = len(ci.external_class_accesses)
             if coupled_classes > MAX_CBO:
-                findings.append(Finding(
+                findings.append(_make_finding(
                     file=ci.filepath, line=ci.line, pattern="#CBO",
                     name="High Coupling Between Objects", severity="warning",
                     message=f"Class `{ci.name}` is coupled to {coupled_classes} other classes "
@@ -1805,7 +1950,7 @@ def _detect_fan_out(all_data: list[FileData]) -> list[Finding]:
         src = module_map[fd.filepath]
         outgoing = {imp for imp in fd.imports if imp in reverse_map}
         if len(outgoing) > MAX_FANOUT:
-            findings.append(Finding(
+            findings.append(_make_finding(
                 file=fd.filepath, line=1, pattern="#FIO",
                 name="Excessive Fan-Out", severity="info",
                 message=f"Module `{src}` has {len(outgoing)} outgoing dependencies "
@@ -1824,7 +1969,7 @@ def _detect_high_rfc(all_data: list[FileData]) -> list[Finding]:
             external_calls = len(ci.external_method_calls)
             rfc = own_methods + external_calls
             if rfc > MAX_RFC:
-                findings.append(Finding(
+                findings.append(_make_finding(
                     file=ci.filepath, line=ci.line, pattern="#RFC",
                     name="High Response for Class", severity="info",
                     message=f"Class `{ci.name}` has RFC={rfc} "
@@ -1844,7 +1989,7 @@ def _detect_middle_man(all_data: list[FileData]) -> list[Finding]:
                 continue
             ratio = ci.delegation_count / ci.non_dunder_method_count
             if ratio > MIDDLE_MAN_RATIO:
-                findings.append(Finding(
+                findings.append(_make_finding(
                     file=ci.filepath, line=ci.line, pattern="#MID",
                     name="Remove Middle Man", severity="info",
                     message=f"Class `{ci.name}` delegates {ci.delegation_count}/{ci.non_dunder_method_count} "
@@ -1991,11 +2136,17 @@ def scan_paths(
         per_file_ignores = config.get("per-file-ignores", {})
 
         if select is not None:
-            select_set = {f"#{s}" if not s.startswith("#") else s for s in select}
+            select_set: set[str] = set()
+            for s in select:
+                resolved = _resolve_code(s)
+                select_set.update(resolved if resolved else {f"#{s}" if not s.startswith("#") else s})
             all_findings = [f for f in all_findings if f.pattern in select_set]
 
         if ignore:
-            ignore_set = {f"#{s}" if not s.startswith("#") else s for s in ignore}
+            ignore_set: set[str] = set()
+            for s in ignore:
+                resolved = _resolve_code(s)
+                ignore_set.update(resolved if resolved else {f"#{s}" if not s.startswith("#") else s})
             all_findings = [f for f in all_findings if f.pattern not in ignore_set]
 
         if per_file_ignores:
@@ -2004,7 +2155,10 @@ def scan_paths(
             for f in all_findings:
                 suppressed = False
                 for glob_pat, codes in per_file_ignores.items():
-                    code_set = {f"#{c}" if not c.startswith("#") else c for c in codes}
+                    code_set: set[str] = set()
+                    for c in codes:
+                        resolved = _resolve_code(c)
+                        code_set.update(resolved if resolved else {f"#{c}" if not c.startswith("#") else c})
                     if fnmatch.fnmatch(f.file, glob_pat) and f.pattern in code_set:
                         suppressed = True
                         break
@@ -2049,15 +2203,17 @@ def _print_summary(filtered: list[Finding]):
         for f in sorted(file_findings, key=lambda x: x.line):
             color = SEVERITY_COLORS.get(f.severity, "")
             sev = f.severity.upper()[:4]
-            print(f"  {color}{sev}{RESET} L{f.line:<5} {f.pattern} {f.name}")
+            code = f.rule_id or f.pattern
+            print(f"  {color}{sev}{RESET} L{f.line:<5} {code} {f.name}")
             print(f"         {f.message}")
         print()
 
     print(f"{BOLD}Top patterns:{RESET}")
     for pattern, count in pattern_counts.most_common(10):
         matching = next((f for f in filtered if f.pattern == pattern), None)
+        code = matching.rule_id or pattern if matching else pattern
         name = matching.name if matching else ""
-        print(f"  {pattern} {name}: {count}")
+        print(f"  {code} {name}: {count}")
     print()
 
 
@@ -2066,7 +2222,8 @@ def _print_github_annotations(filtered: list[Finding]):
     _GH_SEV = {"error": "error", "warning": "warning", "info": "notice"}
     for f in filtered:
         sev = _GH_SEV.get(f.severity, "notice")
-        title = f"{f.pattern} {f.name}"
+        code = f.rule_id or f.pattern
+        title = f"{code} {f.name}"
         print(f"::{sev} file={f.file},line={f.line},title={title}::{f.message}")
 
 
@@ -2109,9 +2266,9 @@ _HELP_TEXT: Final = textwrap.dedent("""\
     Scan Python files for code smells mapped to the 82-pattern refactoring catalog.
 
     Detects 55 patterns programmatically:
-      - 40 per-file (AST analysis)
-      - 10 cross-file (import graph, duplicate detection, inheritance)
-      - 5 OO metrics (LCOM, CBO, fan-out, RFC, middle man)
+      - 40 per-file (AST analysis)    — SC1xx..SC7xx (scope: file)
+      - 10 cross-file (import graph)  — SC3xx..SC6xx (scope: cross_file)
+      - 5 OO metrics (LCOM, CBO, …)   — SC8xx        (scope: metric)
 
     Options:
       --format FMT        Output format: text | json | github (default: text)
@@ -2120,13 +2277,19 @@ _HELP_TEXT: Final = textwrap.dedent("""\
                           (default: error)
       --min-severity SEV  Only display findings >= SEV: info | warning | error
                           (default: info)
-      --select CODES      Only run these checks (comma-separated, e.g. 001,057,CC)
-      --ignore CODES      Skip these checks (comma-separated, e.g. 003,006)
+      --select CODES      Only run these checks (comma-separated, e.g. SC701,057,CC)
+      --ignore CODES      Skip these checks (comma-separated, e.g. SC601,006)
+      --scope SCOPE       Only show findings of this scope: file | cross_file | metric
       --version           Show version and exit
       -h, --help          Show this help
 
+    Rule codes:
+      Each rule has a unified SC code (e.g. SC701) and a legacy pattern ref (e.g. 057).
+      Both formats are accepted in --select, --ignore, and # noqa comments.
+
     Inline suppression:
-      Add ``# noqa: SC057`` to a line to suppress pattern #057 on that line.
+      Add ``# noqa: SC701`` to suppress SC701 (mutable default args) on that line.
+      Legacy ``# noqa: SC057`` still works for backward compatibility.
       Use ``# noqa`` (no codes) to suppress all findings on that line.
 
     Configuration:
@@ -2137,6 +2300,7 @@ _HELP_TEXT: Final = textwrap.dedent("""\
       smellcheck src/
       smellcheck myfile.py --format json
       smellcheck src/ --min-severity warning --fail-on warning
+      smellcheck src/ --scope file
       smellcheck file1.py file2.py --format github
 """)
 
@@ -2154,10 +2318,12 @@ def _pop_option(args: list[str], flag: str) -> str | None:
     return value
 
 
-def _parse_args(argv: list[str]) -> tuple[list[Path], str, str, str, list[str] | None, list[str] | None]:
+def _parse_args(
+    argv: list[str],
+) -> tuple[list[Path], str, str, str, list[str] | None, list[str] | None, str | None]:
     """Parse CLI arguments.
 
-    Returns ``(paths, output_format, min_severity, fail_on, select, ignore)``.
+    Returns ``(paths, output_format, min_severity, fail_on, select, ignore, scope_filter)``.
     """
     args = list(argv)
 
@@ -2202,6 +2368,13 @@ def _parse_args(argv: list[str]) -> tuple[list[Path], str, str, str, list[str] |
     select = [c.strip() for c in select_raw.split(",")] if select_raw else None
     ignore = [c.strip() for c in ignore_raw.split(",")] if ignore_raw else None
 
+    # --scope
+    scope_filter = _pop_option(args, "--scope")
+    if scope_filter is not None and scope_filter not in _VALID_SCOPES:
+        print(f"Error: invalid --scope '{scope_filter}' -- must be one of: file, cross_file, metric",
+              file=sys.stderr)
+        sys.exit(1)
+
     # Remaining args are paths
     if not args:
         print("Error: at least one path is required", file=sys.stderr)
@@ -2215,11 +2388,13 @@ def _parse_args(argv: list[str]) -> tuple[list[Path], str, str, str, list[str] |
             sys.exit(1)
         paths.append(p)
 
-    return paths, output_format, min_severity, fail_on, select, ignore
+    return paths, output_format, min_severity, fail_on, select, ignore, scope_filter
 
 
 def main():
-    paths, output_format, min_severity, fail_on, select, ignore = _parse_args(sys.argv[1:])
+    paths, output_format, min_severity, fail_on, select, ignore, scope_filter = _parse_args(
+        sys.argv[1:],
+    )
 
     # Load config from nearest pyproject.toml
     config = load_config(paths[0])
@@ -2230,14 +2405,15 @@ def main():
     if ignore is not None:
         config["ignore"] = ignore
 
-    # Config can provide defaults for format / fail-on (CLI takes precedence)
-    # Already handled: CLI values are used directly
-
     findings = scan_paths(paths, config=config)
+
+    # Apply --scope filter
+    if scope_filter is not None:
+        findings = [f for f in findings if f.scope == scope_filter]
+
     print_findings(findings, min_severity=min_severity, output_format=output_format)
 
     fail_rank = SEVERITY_ORDER.get(fail_on, 2)
-    min_display_rank = SEVERITY_ORDER.get(min_severity, 0)
     has_fail = any(f.severity_rank >= fail_rank for f in findings)
     sys.exit(1 if has_fail else 0)
 

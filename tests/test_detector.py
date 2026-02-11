@@ -8,14 +8,13 @@ import sys
 import textwrap
 from pathlib import Path
 
-import pytest
-
 from smellcheck import __version__
 from smellcheck.detector import (
-    Finding,
-    SmellDetector,
-    _is_suppressed,
+    _RULE_REGISTRY,
+    _VALID_FAMILIES,
+    _VALID_SCOPES,
     _parse_args,
+    _resolve_code,
     load_config,
     print_findings,
     scan_path,
@@ -96,7 +95,7 @@ def test_multiple_paths(tmp_path):
 
 def test_parse_args_format_github(tmp_path):
     p = _write_py(tmp_path, "x = 1\n")
-    paths, fmt, sev, fail_on, select, ignore = _parse_args(
+    paths, fmt, sev, fail_on, select, ignore, scope = _parse_args(
         [str(p), "--format", "github"]
     )
     assert fmt == "github"
@@ -105,7 +104,7 @@ def test_parse_args_format_github(tmp_path):
 
 def test_parse_args_fail_on(tmp_path):
     p = _write_py(tmp_path, "x = 1\n")
-    paths, fmt, sev, fail_on, select, ignore = _parse_args(
+    paths, fmt, sev, fail_on, select, ignore, scope = _parse_args(
         [str(p), "--fail-on", "warning"]
     )
     assert fail_on == "warning"
@@ -233,3 +232,103 @@ def test_cli_help():
     assert result.returncode == 0
     assert "--format" in result.stdout
     assert "--fail-on" in result.stdout
+    assert "--scope" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# Unified SC code naming system (issue #4)
+# ---------------------------------------------------------------------------
+
+
+def test_rule_registry_complete():
+    """Registry has 55 entries with valid families and scopes."""
+    assert len(_RULE_REGISTRY) == 55
+    for pat, rd in _RULE_REGISTRY.items():
+        assert pat.startswith("#"), f"Pattern {pat!r} must start with '#'"
+        assert rd.rule_id.startswith("SC"), f"rule_id {rd.rule_id!r} must start with 'SC'"
+        assert rd.family in _VALID_FAMILIES, f"Invalid family {rd.family!r} for {pat}"
+        assert rd.scope in _VALID_SCOPES, f"Invalid scope {rd.scope!r} for {pat}"
+        assert rd.default_severity in {"info", "warning", "error"}, (
+            f"Invalid severity {rd.default_severity!r} for {pat}"
+        )
+
+
+def test_rule_id_populated(tmp_path):
+    """Mutable default triggers #057 with rule_id SC701 and scope file."""
+    p = _write_py(tmp_path, "def foo(x=[]):\n    return x\n")
+    findings = scan_path(p)
+    f057 = [f for f in findings if f.pattern == "#057"]
+    assert len(f057) >= 1
+    assert f057[0].rule_id == "SC701"
+    assert f057[0].scope == "file"
+
+
+def test_resolve_code_formats():
+    """_resolve_code handles SC701, 057, #057, SC057, CC."""
+    assert _resolve_code("SC701") == {"#057"}
+    assert _resolve_code("057") == {"#057"}
+    assert _resolve_code("#057") == {"#057"}
+    assert _resolve_code("SC057") == {"#057"}
+    assert _resolve_code("CC") == {"#CC"}
+    assert _resolve_code("SC210") == {"#CC"}
+    assert _resolve_code("LCOM") == {"#LCOM"}
+    assert _resolve_code("NONEXISTENT") == set()
+
+
+def test_noqa_with_sc_rule_id(tmp_path):
+    """``# noqa: SC701`` suppresses #057 findings."""
+    p = _write_py(tmp_path, "def foo(x=[]):  # noqa: SC701\n    pass\n")
+    findings = scan_paths([p])
+    patterns = [f.pattern for f in findings]
+    assert "#057" not in patterns
+
+
+def test_config_select_sc_code(tmp_path):
+    """select = ["SC701"] in config keeps only #057 findings."""
+    _write_py(tmp_path, "def foo(x=[]): pass\n")
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        '[tool.smellcheck]\nselect = ["SC701"]\n', encoding="utf-8"
+    )
+    config = load_config(tmp_path)
+    findings = scan_paths([tmp_path], config=config)
+    assert all(f.pattern == "#057" for f in findings)
+    assert len(findings) >= 1
+
+
+def test_config_ignore_sc_code(tmp_path):
+    """ignore = ["SC701"] in config removes #057 findings."""
+    _write_py(tmp_path, "def foo(x=[]): pass\n")
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        '[tool.smellcheck]\nignore = ["SC701"]\n', encoding="utf-8"
+    )
+    config = load_config(tmp_path)
+    findings = scan_paths([tmp_path], config=config)
+    patterns = [f.pattern for f in findings]
+    assert "#057" not in patterns
+
+
+def test_scope_filter_cli(tmp_path):
+    """--scope file excludes cross-file and metric findings."""
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    result = _run_cli(str(p), "--scope", "file", "--format", "json")
+    data = json.loads(result.stdout)
+    # All findings should have scope == "file"
+    assert all(d.get("scope") == "file" for d in data)
+
+
+def test_json_includes_rule_id(tmp_path):
+    """JSON output includes rule_id and scope fields."""
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    findings = scan_path(p)
+    print_findings(findings, output_format="json")
+    # Verify through dataclass fields directly
+    f057 = [f for f in findings if f.pattern == "#057"]
+    assert len(f057) >= 1
+    from dataclasses import asdict
+    d = asdict(f057[0])
+    assert "rule_id" in d
+    assert "scope" in d
+    assert d["rule_id"] == "SC701"
+    assert d["scope"] == "file"
