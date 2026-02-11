@@ -4,11 +4,28 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
-from smellcheck.detector import Finding, RuleDef, SmellDetector, print_findings, scan_path
+from smellcheck.detector import (
+    Finding,
+    RuleDef,
+    SmellDetector,
+    load_config,
+    print_findings,
+    scan_path,
+    scan_paths,
+)
 
 try:
     __version__ = version("smellcheck")
 except PackageNotFoundError:
     __version__ = "0.2.4"
 
-__all__ = ["Finding", "RuleDef", "SmellDetector", "scan_path", "print_findings", "__version__"]
+__all__ = [
+    "Finding",
+    "RuleDef",
+    "SmellDetector",
+    "load_config",
+    "print_findings",
+    "scan_path",
+    "scan_paths",
+    "__version__",
+]
