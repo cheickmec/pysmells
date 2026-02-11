@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="smellcheck logo" width="200">
+  <img src="https://raw.githubusercontent.com/cheickmec/smellcheck/main/assets/logo.png" alt="smellcheck logo" width="200">
 </p>
 
 <h1 align="center">smellcheck</h1>
