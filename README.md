@@ -114,6 +114,12 @@ smellcheck src/ --ignore 003,006
 
 # Module execution
 python -m smellcheck src/
+
+# Generate a baseline of current findings
+smellcheck src/ --generate-baseline > .smellcheck-baseline.json
+
+# Only report findings not in the baseline
+smellcheck src/ --baseline .smellcheck-baseline.json
 ```
 
 ## Configuration
@@ -127,6 +133,7 @@ ignore = ["003", "006"]              # skip these checks
 per-file-ignores = {"tests/*" = ["002", "034"]}  # per-path overrides
 fail-on = "warning"                  # override default fail-on
 format = "text"                      # override default format
+baseline = ".smellcheck-baseline.json"  # suppress known findings
 ```
 
 CLI flags override config values.
@@ -142,6 +149,24 @@ def foo(x=[]):  # noqa: SC057
 
 Use `# noqa` (no codes) to suppress all findings on that line. Multiple codes: `# noqa: SC003,SC006`
 
+## Baseline
+
+For large codebases, you can adopt smellcheck incrementally using a baseline file. The baseline records fingerprints of existing findings so only **new** issues are reported.
+
+```bash
+# 1. Generate a baseline from the current state
+smellcheck src/ --generate-baseline > .smellcheck-baseline.json
+
+# 2. Run with the baseline — only new findings are reported
+smellcheck src/ --baseline .smellcheck-baseline.json
+
+# 3. Or set it in pyproject.toml so every run uses it automatically
+```
+
+Fingerprints are resilient to line-number changes — renaming or moving code around won't break the baseline. When you fix a baselined smell, its entry is silently ignored.
+
+`--generate-baseline` and `--baseline` are mutually exclusive.
+
 ## Features
 
 - **55 automated smell checks** -- per-file AST analysis, cross-file dependency analysis, and OO metrics
@@ -149,6 +174,7 @@ Use `# noqa` (no codes) to suppress all findings on that line. Multiple codes: `
 - **Zero dependencies** -- stdlib-only, runs on any Python 3.10+ installation
 - **Multiple output formats** -- text (terminal), JSON (machine-readable), GitHub annotations (CI)
 - **Configurable** -- pyproject.toml config, inline suppression, CLI overrides
+- **Baseline support** -- adopt incrementally by suppressing existing findings and only failing on new ones
 - **Four distribution channels** -- pip, GitHub Action, pre-commit, Agent Skills
 
 ## Detected Patterns
