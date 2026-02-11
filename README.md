@@ -114,6 +114,12 @@ smellcheck src/ --ignore 003,006
 
 # Module execution
 python -m smellcheck src/
+
+# Generate a baseline of current findings
+smellcheck src/ --generate-baseline > .smellcheck-baseline.json
+
+# Only report findings not in the baseline
+smellcheck src/ --baseline .smellcheck-baseline.json
 ```
 
 ## Configuration
@@ -127,6 +133,7 @@ ignore = ["003", "006"]              # skip these checks
 per-file-ignores = {"tests/*" = ["002", "034"]}  # per-path overrides
 fail-on = "warning"                  # override default fail-on
 format = "text"                      # override default format
+baseline = ".smellcheck-baseline.json"  # suppress known findings
 ```
 
 CLI flags override config values.
@@ -142,6 +149,24 @@ def foo(x=[]):  # noqa: SC057
 
 Use `# noqa` (no codes) to suppress all findings on that line. Multiple codes: `# noqa: SC003,SC006`
 
+## Baseline
+
+For large codebases, you can adopt smellcheck incrementally using a baseline file. The baseline records fingerprints of existing findings so only **new** issues are reported.
+
+```bash
+# 1. Generate a baseline from the current state
+smellcheck src/ --generate-baseline > .smellcheck-baseline.json
+
+# 2. Run with the baseline — only new findings are reported
+smellcheck src/ --baseline .smellcheck-baseline.json
+
+# 3. Or set it in pyproject.toml so every run uses it automatically
+```
+
+Fingerprints are resilient to line-number changes — renaming or moving code around won't break the baseline. When you fix a baselined smell, its entry is silently ignored.
+
+`--generate-baseline` and `--baseline` are mutually exclusive.
+
 ## Features
 
 - **55 automated smell checks** -- per-file AST analysis, cross-file dependency analysis, and OO metrics
@@ -149,79 +174,82 @@ Use `# noqa` (no codes) to suppress all findings on that line. Multiple codes: `
 - **Zero dependencies** -- stdlib-only, runs on any Python 3.10+ installation
 - **Multiple output formats** -- text (terminal), JSON (machine-readable), GitHub annotations (CI)
 - **Configurable** -- pyproject.toml config, inline suppression, CLI overrides
+- **Baseline support** -- adopt incrementally by suppressing existing findings and only failing on new ones
 - **Four distribution channels** -- pip, GitHub Action, pre-commit, Agent Skills
 
 ## Detected Patterns
 
+Every rule has a unified **SC code** (e.g. `SC701`) and a legacy **pattern ref** (e.g. `057`). Both forms work in `--select`, `--ignore`, and `# noqa` comments.
+
 ### Per-File (40 checks)
 
-| # | Pattern | Severity |
-|---|---------|----------|
-| 001 | Setters (half-built objects) | warning |
-| 002 | Long functions (>20 lines) | warning |
-| 003 | Magic numbers | info |
-| 004 | Bare except / unused exception variable | warning |
-| 006 | Generic names (data, result, tmp) | info |
-| 007 | Extract class (too many methods) | info |
-| 008 | UPPER_CASE without Final | info |
-| 009 | Unprotected public attributes | info |
-| 014 | isinstance chains | warning |
-| 016 | Half-built objects (init assigns None) | warning |
-| 017 | Boolean flag parameters | info |
-| 018 | Singleton pattern | warning |
-| 021 | Dead code after return | warning |
-| 024 | Global mutable state | warning |
-| 026 | input() in business logic | warning |
-| 028 | Sequential IDs | info |
-| 029 | Functions returning None or list | info |
-| 033 | Excessive decorators (>3) | info |
-| 034 | Too many parameters (>5) | warning |
-| 036 | String concatenation for multiline | info |
-| 039 | Deep nesting (>4 levels) | warning |
-| 040 | Loop + append pattern | info |
-| 041 | CQS violation (query + modify) | warning |
-| 042 | Complex boolean expressions | warning |
-| 051 | Error codes instead of exceptions | warning |
-| 054 | Law of Demeter violation | info |
-| 055 | Boolean control flag in loop | info |
-| 057 | Mutable default arguments | error |
-| 058 | open() without context manager | warning |
-| 061 | Dataclass candidate | info |
-| 062 | Sequential tuple indexing | info |
-| 063 | contextlib candidate | info |
-| CC | Cyclomatic complexity (>10) | warning |
-| 064 | Unused function parameters | warning |
-| 065 | Empty catch block | warning |
-| 066 | Long lambda (>60 chars) | info |
-| 067 | Complex comprehension (>2 generators) | warning |
-| 068 | Missing default else branch | info |
-| 069 | Lazy class (<2 methods) | info |
-| 070 | Temporary fields | warning |
+| SC Code | # | Pattern | Severity |
+|---------|---|---------|----------|
+| SC101 | 001 | Setters (half-built objects) | warning |
+| SC102 | 008 | UPPER_CASE without Final | info |
+| SC103 | 009 | Unprotected public attributes | info |
+| SC104 | 016 | Half-built objects (init assigns None) | warning |
+| SC105 | 017 | Boolean flag parameters | info |
+| SC106 | 024 | Global mutable state | info |
+| SC107 | 028 | Sequential IDs | info |
+| SC201 | 002 | Long functions (>20 lines) | warning |
+| SC202 | 006 | Generic names (data, result, tmp) | info |
+| SC203 | 026 | input() in business logic | warning |
+| SC204 | 029 | Functions returning None or list | info |
+| SC205 | 033 | Excessive decorators (>3) | info |
+| SC206 | 034 | Too many parameters (>5) | warning |
+| SC207 | 041 | CQS violation (query + modify) | info |
+| SC208 | 064 | Unused function parameters | warning |
+| SC209 | 066 | Long lambda (>60 chars) | info |
+| SC210 | CC | Cyclomatic complexity (>10) | warning |
+| SC301 | 007 | Extract class (too many methods) | info |
+| SC302 | 014 | isinstance chains | warning |
+| SC303 | 018 | Singleton pattern | warning |
+| SC304 | 061 | Dataclass candidate | info |
+| SC305 | 062 | Sequential tuple indexing | info |
+| SC306 | 069 | Lazy class (<2 methods) | info |
+| SC307 | 070 | Temporary fields | warning |
+| SC401 | 021 | Dead code after return | warning |
+| SC402 | 039 | Deep nesting (>4 levels) | warning |
+| SC403 | 040 | Loop + append pattern | info |
+| SC404 | 042 | Complex boolean expressions | warning |
+| SC405 | 055 | Boolean control flag in loop | info |
+| SC406 | 067 | Complex comprehension (>2 generators) | info |
+| SC407 | 068 | Missing default else branch | info |
+| SC501 | 051 | Error codes instead of exceptions | warning |
+| SC502 | 054 | Law of Demeter violation | info |
+| SC601 | 003 | Magic numbers | info |
+| SC602 | 004 | Bare except / unused exception variable | error |
+| SC603 | 036 | String concatenation for multiline | info |
+| SC604 | 063 | contextlib candidate | info |
+| SC605 | 065 | Empty catch block | warning |
+| SC701 | 057 | Mutable default arguments | error |
+| SC702 | 058 | open() without context manager | warning |
 
 ### Cross-File (10 checks)
 
-| # | Pattern | Description |
-|---|---------|-------------|
-| 013 | Duplicate functions | AST-normalized hashing across files |
-| CYC | Cyclic imports | DFS cycle detection |
-| GOD | God modules | >500 lines or >30 top-level definitions |
-| FE | Feature envy | Function accesses external attributes more than own |
-| SHO | Shotgun surgery | Function called from >5 different files |
-| DIT | Deep inheritance | Inheritance depth >4 |
-| WHI | Wide hierarchy | >5 direct subclasses |
-| INT | Inappropriate intimacy | >3 bidirectional class references between files |
-| SPG | Speculative generality | Abstract class with no concrete subclasses |
-| UDE | Unstable dependency | Stable module depends on unstable module |
+| SC Code | # | Pattern | Description |
+|---------|---|---------|-------------|
+| SC211 | FE | Feature envy | Function accesses external attributes more than own |
+| SC308 | DIT | Deep inheritance | Inheritance depth >4 |
+| SC309 | WHI | Wide hierarchy | >5 direct subclasses |
+| SC503 | CYC | Cyclic imports | DFS cycle detection |
+| SC504 | GOD | God modules | >500 lines or >30 top-level definitions |
+| SC505 | SHO | Shotgun surgery | Function called from >5 different files |
+| SC506 | INT | Inappropriate intimacy | >3 bidirectional class references between files |
+| SC507 | SPG | Speculative generality | Abstract class with no concrete subclasses |
+| SC508 | UDE | Unstable dependency | Stable module depends on unstable module |
+| SC606 | 013 | Duplicate functions | AST-normalized hashing across files |
 
 ### OO Metrics (5 checks)
 
-| # | Metric | Threshold |
-|---|--------|-----------|
-| LCOM | Lack of Cohesion of Methods | >0.8 |
-| CBO | Coupling Between Objects | >8 |
-| FIO | Excessive Fan-Out | >15 |
-| RFC | Response for a Class | >20 |
-| MID | Middle Man (delegation ratio) | >50% |
+| SC Code | # | Metric | Threshold |
+|---------|---|--------|-----------|
+| SC801 | LCOM | Lack of Cohesion of Methods | >0.8 |
+| SC802 | CBO | Coupling Between Objects | >8 |
+| SC803 | FIO | Excessive Fan-Out | >15 |
+| SC804 | RFC | Response for a Class | >20 |
+| SC805 | MID | Middle Man (delegation ratio) | >50% |
 
 ## Refactoring Reference Files
 
@@ -265,7 +293,7 @@ Each pattern includes a description, before/after code examples, and trade-offs:
 | Dependencies | 0 (stdlib) | pylint, radon | DesigniteJava | pylint, radon, cohesion |
 | Python-specific idioms | Yes | No | No | No |
 | Cross-file analysis | Yes | Limited | Yes | No |
-| OO metrics | 6 | 19 | 0 | 1 |
+| OO metrics | 5 | 19 | 0 | 1 |
 | Distribution channels | 4 (pip, GHA, pre-commit, Agent Skills) | 1 | 1 | 1 |
 
 ## Contributing

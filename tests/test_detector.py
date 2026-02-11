@@ -13,6 +13,7 @@ from smellcheck.detector import (
     _RULE_REGISTRY,
     _VALID_FAMILIES,
     _VALID_SCOPES,
+    _fingerprint,
     _parse_args,
     _resolve_code,
     load_config,
@@ -25,6 +26,7 @@ from smellcheck.detector import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _write_py(tmp_path: Path, code: str, name: str = "sample.py") -> Path:
     p = tmp_path / name
@@ -63,10 +65,13 @@ def test_empty_file_no_findings(tmp_path):
 
 
 def test_mutable_default_detected(tmp_path):
-    p = _write_py(tmp_path, """\
+    p = _write_py(
+        tmp_path,
+        """\
         def foo(x=[]):
             return x
-    """)
+    """,
+    )
     findings = scan_path(p)
     patterns = [f.pattern for f in findings]
     assert "#057" in patterns
@@ -176,9 +181,7 @@ def test_noqa_all(tmp_path):
 def test_config_ignore(tmp_path):
     _write_py(tmp_path, "def foo(x=[]): pass\n")
     pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text(
-        '[tool.smellcheck]\nignore = ["057"]\n', encoding="utf-8"
-    )
+    pyproject.write_text('[tool.smellcheck]\nignore = ["057"]\n', encoding="utf-8")
     config = load_config(tmp_path)
     findings = scan_paths([tmp_path], config=config)
     patterns = [f.pattern for f in findings]
@@ -188,9 +191,7 @@ def test_config_ignore(tmp_path):
 def test_config_select(tmp_path):
     _write_py(tmp_path, "def foo(x=[]): pass\n")
     pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text(
-        '[tool.smellcheck]\nselect = ["057"]\n', encoding="utf-8"
-    )
+    pyproject.write_text('[tool.smellcheck]\nselect = ["057"]\n', encoding="utf-8")
     config = load_config(tmp_path)
     findings = scan_paths([tmp_path], config=config)
     # Only #057 findings should remain
@@ -245,7 +246,9 @@ def test_rule_registry_complete():
     assert len(_RULE_REGISTRY) == 55
     for pat, rd in _RULE_REGISTRY.items():
         assert pat.startswith("#"), f"Pattern {pat!r} must start with '#'"
-        assert rd.rule_id.startswith("SC"), f"rule_id {rd.rule_id!r} must start with 'SC'"
+        assert rd.rule_id.startswith("SC"), (
+            f"rule_id {rd.rule_id!r} must start with 'SC'"
+        )
         assert rd.family in _VALID_FAMILIES, f"Invalid family {rd.family!r} for {pat}"
         assert rd.scope in _VALID_SCOPES, f"Invalid scope {rd.scope!r} for {pat}"
         assert rd.default_severity in {"info", "warning", "error"}, (
@@ -287,9 +290,7 @@ def test_config_select_sc_code(tmp_path):
     """select = ["SC701"] in config keeps only #057 findings."""
     _write_py(tmp_path, "def foo(x=[]): pass\n")
     pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text(
-        '[tool.smellcheck]\nselect = ["SC701"]\n', encoding="utf-8"
-    )
+    pyproject.write_text('[tool.smellcheck]\nselect = ["SC701"]\n', encoding="utf-8")
     config = load_config(tmp_path)
     findings = scan_paths([tmp_path], config=config)
     assert all(f.pattern == "#057" for f in findings)
@@ -300,9 +301,7 @@ def test_config_ignore_sc_code(tmp_path):
     """ignore = ["SC701"] in config removes #057 findings."""
     _write_py(tmp_path, "def foo(x=[]): pass\n")
     pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text(
-        '[tool.smellcheck]\nignore = ["SC701"]\n', encoding="utf-8"
-    )
+    pyproject.write_text('[tool.smellcheck]\nignore = ["SC701"]\n', encoding="utf-8")
     config = load_config(tmp_path)
     findings = scan_paths([tmp_path], config=config)
     patterns = [f.pattern for f in findings]
@@ -327,8 +326,141 @@ def test_json_includes_rule_id(tmp_path):
     f057 = [f for f in findings if f.pattern == "#057"]
     assert len(f057) >= 1
     from dataclasses import asdict
+
     d = asdict(f057[0])
     assert "rule_id" in d
     assert "scope" in d
     assert d["rule_id"] == "SC701"
     assert d["scope"] == "file"
+
+
+# ---------------------------------------------------------------------------
+# Baseline workflow (issue #5)
+# ---------------------------------------------------------------------------
+
+
+def test_generate_baseline_json_structure(tmp_path):
+    """--generate-baseline outputs valid JSON with version/generated/findings keys."""
+    _write_py(tmp_path, "def foo(x=[]): pass\n")
+    result = _run_cli(str(tmp_path), "--generate-baseline", cwd=tmp_path)
+    assert result.returncode == 0
+    data = json.loads(result.stdout)
+    assert "version" in data
+    assert "generated" in data
+    assert "findings" in data
+    assert isinstance(data["findings"], list)
+    assert len(data["findings"]) >= 1
+    entry = data["findings"][0]
+    for key in ("fingerprint", "file", "pattern", "line", "name"):
+        assert key in entry, f"Missing key {key!r} in baseline entry"
+
+
+def test_baseline_suppresses_existing_findings(tmp_path):
+    """Generate baseline, run with --baseline, same code -> empty output."""
+    _write_py(tmp_path, "def foo(x=[]): pass\n")
+    # Generate baseline
+    gen = _run_cli(str(tmp_path), "--generate-baseline", cwd=tmp_path)
+    assert gen.returncode == 0
+    bl = tmp_path / ".smellcheck-baseline.json"
+    bl.write_text(gen.stdout, encoding="utf-8")
+    # Run with baseline
+    result = _run_cli(
+        str(tmp_path), "--baseline", str(bl), "--format", "json", cwd=tmp_path
+    )
+    data = json.loads(result.stdout)
+    assert data == []
+    assert "suppressed" in result.stderr
+
+
+def test_baseline_reports_new_findings(tmp_path):
+    """Baseline from file A, add file B -> B's findings appear."""
+    _write_py(tmp_path, "def foo(x=[]): pass\n", name="a.py")
+    # Generate baseline from a.py only
+    gen = _run_cli(str(tmp_path / "a.py"), "--generate-baseline", cwd=tmp_path)
+    bl = tmp_path / "baseline.json"
+    bl.write_text(gen.stdout, encoding="utf-8")
+    # Add file B with its own finding
+    _write_py(tmp_path, "def bar(y={}): pass\n", name="b.py")
+    # Run on whole directory with baseline
+    result = _run_cli(
+        str(tmp_path), "--baseline", str(bl), "--format", "json", cwd=tmp_path
+    )
+    data = json.loads(result.stdout)
+    # b.py findings should appear (new), a.py findings suppressed
+    files = {d["file"] for d in data}
+    assert any("b.py" in f for f in files)
+
+
+def test_baseline_ignores_disappeared_findings(tmp_path):
+    """Baseline with smell, fix code, run -> no crash, no findings."""
+    _write_py(tmp_path, "def foo(x=[]): pass\n")
+    gen = _run_cli(str(tmp_path), "--generate-baseline", cwd=tmp_path)
+    bl = tmp_path / "baseline.json"
+    bl.write_text(gen.stdout, encoding="utf-8")
+    # Fix the code (remove smell)
+    _write_py(tmp_path, "def foo(x=None): pass\n")
+    result = _run_cli(
+        str(tmp_path), "--baseline", str(bl), "--format", "json", cwd=tmp_path
+    )
+    data = json.loads(result.stdout)
+    assert data == []
+
+
+def test_fingerprint_resilient_to_line_shift(tmp_path):
+    """Same finding at different line numbers -> same fingerprint."""
+    from smellcheck.detector import Finding
+
+    f1 = Finding(
+        file=str(tmp_path / "a.py"),
+        line=5,
+        pattern="#057",
+        name="Replace Mutable Default Arguments",
+        severity="error",
+        message="`foo` has mutable default argument `[]`",
+        category="idioms",
+    )
+    f2 = Finding(
+        file=str(tmp_path / "a.py"),
+        line=42,
+        pattern="#057",
+        name="Replace Mutable Default Arguments",
+        severity="error",
+        message="`foo` has mutable default argument `[]`",
+        category="idioms",
+    )
+    assert _fingerprint(f1, tmp_path) == _fingerprint(f2, tmp_path)
+
+
+def test_generate_baseline_and_baseline_mutually_exclusive(tmp_path):
+    """Both flags -> returncode 1, 'mutually exclusive' in stderr."""
+    _write_py(tmp_path, "x = 1\n")
+    bl = tmp_path / "bl.json"
+    bl.write_text('{"findings": []}', encoding="utf-8")
+    result = _run_cli(
+        str(tmp_path),
+        "--generate-baseline",
+        "--baseline",
+        str(bl),
+        cwd=tmp_path,
+    )
+    assert result.returncode == 1
+    assert "mutually exclusive" in result.stderr
+
+
+def test_baseline_config_support(tmp_path):
+    """baseline = "..." in pyproject.toml honored without CLI flag."""
+    _write_py(tmp_path, "def foo(x=[]): pass\n")
+    # Generate baseline
+    gen = _run_cli(str(tmp_path), "--generate-baseline", cwd=tmp_path)
+    bl = tmp_path / ".smellcheck-baseline.json"
+    bl.write_text(gen.stdout, encoding="utf-8")
+    # Configure via pyproject.toml
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        f'[tool.smellcheck]\nbaseline = "{bl}"\n',
+        encoding="utf-8",
+    )
+    result = _run_cli(str(tmp_path), "--format", "json", cwd=tmp_path)
+    data = json.loads(result.stdout)
+    assert data == []
+    assert "suppressed" in result.stderr

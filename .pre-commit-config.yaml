@@ -23,3 +23,13 @@ repos:
         language: system
         pass_filenames: false
         files: '(pyproject\.toml|\.release-please-manifest\.json|marketplace\.json)$'
+
+      - id: doc-staleness-reminder
+        name: Remind about doc updates
+        entry: bash scripts/check-docs-reminder.sh
+        language: system
+        files: ^src/
+        types: [python]
+        pass_filenames: false
+        always_run: false
+        verbose: true

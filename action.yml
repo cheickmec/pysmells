@@ -21,6 +21,10 @@ inputs:
     description: 'Output format: text | json | github'
     required: false
     default: 'github'
+  baseline:
+    description: 'Path to baseline JSON file (suppress known findings)'
+    required: false
+    default: ''
   python-version:
     description: 'Python version to use'
     required: false
@@ -42,4 +46,5 @@ runs:
         smellcheck ${{ inputs.paths }} \
           --format ${{ inputs.format }} \
           --fail-on ${{ inputs.fail-on }} \
-          --min-severity ${{ inputs.min-severity }}
+          --min-severity ${{ inputs.min-severity }} \
+          ${{ inputs.baseline && format('--baseline {0}', inputs.baseline) || '' }}

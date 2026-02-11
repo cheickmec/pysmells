@@ -31,9 +31,18 @@ from typing import Final
 
 SEVERITY_ORDER: Final = {"info": 0, "warning": 1, "error": 2}
 
-_VALID_FAMILIES: Final = frozenset({
-    "state", "functions", "types", "control", "architecture", "hygiene", "idioms", "metrics",
-})
+_VALID_FAMILIES: Final = frozenset(
+    {
+        "state",
+        "functions",
+        "types",
+        "control",
+        "architecture",
+        "hygiene",
+        "idioms",
+        "metrics",
+    }
+)
 _VALID_SCOPES: Final = frozenset({"file", "cross_file", "metric"})
 
 
@@ -118,7 +127,9 @@ _RULE_REGISTRY: dict[str, RuleDef] = {
 # fmt: on
 
 # Reverse lookup: rule_id -> legacy pattern (e.g. "SC701" -> "#057")
-_RULE_ID_TO_LEGACY: dict[str, str] = {rd.rule_id: pat for pat, rd in _RULE_REGISTRY.items()}
+_RULE_ID_TO_LEGACY: dict[str, str] = {
+    rd.rule_id: pat for pat, rd in _RULE_REGISTRY.items()
+}
 
 
 @dataclass
@@ -142,6 +153,7 @@ class Finding:
 # ClassInfo: per-class metadata for OO metrics (Tier 2/3)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ClassInfo:
     name: str
@@ -151,9 +163,15 @@ class ClassInfo:
     method_count: int = 0
     field_count: int = 0
     all_fields: list[str] = field(default_factory=list)
-    methods_using_fields: dict[str, set[str]] = field(default_factory=dict)  # method -> fields accessed
-    external_class_accesses: dict[str, int] = field(default_factory=dict)  # other_class -> access count
-    external_method_calls: set[str] = field(default_factory=set)  # "ClassName.method" distinct calls
+    methods_using_fields: dict[str, set[str]] = field(
+        default_factory=dict
+    )  # method -> fields accessed
+    external_class_accesses: dict[str, int] = field(
+        default_factory=dict
+    )  # other_class -> access count
+    external_method_calls: set[str] = field(
+        default_factory=set
+    )  # "ClassName.method" distinct calls
     delegation_count: int = 0  # methods that just delegate to another object
     non_dunder_method_count: int = 0
     is_abstract: bool = False
@@ -177,10 +195,25 @@ FEATURE_ENVY_THRESHOLD: Final = 3
 HASH_PREFIX_LEN: Final = 12
 SEPARATOR_WIDTH: Final = 60
 MAGIC_NUMBER_WHITELIST: Final = frozenset({0, 1, -1, 2, 0.0, 1.0, 0.5, 100, 10})
-GENERIC_NAMES: Final = frozenset({
-    "result", "results", "res", "data", "tmp", "temp", "val", "ret",
-    "output", "out", "obj", "item", "elem", "value", "info",
-})
+GENERIC_NAMES: Final = frozenset(
+    {
+        "result",
+        "results",
+        "res",
+        "data",
+        "tmp",
+        "temp",
+        "val",
+        "ret",
+        "output",
+        "out",
+        "obj",
+        "item",
+        "elem",
+        "value",
+        "info",
+    }
+)
 
 # --- Tier 1: new per-file thresholds ---
 MAX_LAMBDA_LENGTH: Final = 60  # characters of unparsed source
@@ -240,6 +273,87 @@ def load_config(target: Path) -> dict:
     except Exception:
         return {}
     return dict(data.get("tool", {}).get("smellcheck", {}))
+
+
+# ---------------------------------------------------------------------------
+# Baseline support (--generate-baseline / --baseline)
+# ---------------------------------------------------------------------------
+
+
+def _normalize_message(msg: str) -> str:
+    """Strip digits and collapse whitespace for fingerprint stability."""
+    return re.sub(r"\s+", " ", re.sub(r"\d+", "", msg)).strip().lower()
+
+
+def _fingerprint(finding: Finding, base_path: Path) -> str:
+    """Line-number-resilient fingerprint. Uses (rel_file, pattern, norm_message)."""
+    try:
+        rel = Path(finding.file).resolve().relative_to(base_path.resolve()).as_posix()
+    except ValueError:
+        rel = Path(finding.file).name
+    raw = f"{rel}\0{finding.pattern}\0{_normalize_message(finding.message)}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:HASH_PREFIX_LEN]
+
+
+def _generate_baseline_json(findings: list[Finding], base_path: Path) -> str:
+    """Produce baseline JSON from current findings."""
+    from datetime import datetime, timezone
+
+    from smellcheck import __version__
+
+    entries = []
+    for f in findings:
+        try:
+            rel = Path(f.file).resolve().relative_to(base_path.resolve()).as_posix()
+        except ValueError:
+            rel = Path(f.file).name
+        entries.append(
+            {
+                "fingerprint": _fingerprint(f, base_path),
+                "file": rel,
+                "pattern": f.rule_id or f.pattern,
+                "line": f.line,
+                "name": f.name,
+            }
+        )
+    return json.dumps(
+        {
+            "version": __version__,
+            "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "findings": entries,
+        },
+        indent=2,
+    )
+
+
+def _load_baseline(path: Path) -> set[str]:
+    """Load fingerprints from a baseline file. Exits on error."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        print(f"Error: baseline file not found: {path}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: invalid baseline JSON in {path}: {e}", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(data, dict) or "findings" not in data:
+        print(f"Error: baseline file missing 'findings' key: {path}", file=sys.stderr)
+        sys.exit(1)
+    return {entry["fingerprint"] for entry in data["findings"]}
+
+
+def _filter_baseline(
+    findings: list[Finding], baseline_fps: set[str], base_path: Path
+) -> tuple[list[Finding], int]:
+    """Remove baselined findings. Returns (new_findings, suppressed_count)."""
+    new: list[Finding] = []
+    suppressed = 0
+    for f in findings:
+        if _fingerprint(f, base_path) in baseline_fps:
+            suppressed += 1
+        else:
+            new.append(f)
+    return new, suppressed
 
 
 # ---------------------------------------------------------------------------
@@ -372,7 +486,11 @@ def _normalize_ast(node: ast.AST) -> str:
     parts: list[str] = []
 
     def _walk(n: ast.AST):
-        if isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant) and isinstance(n.value.value, str):
+        if (
+            isinstance(n, ast.Expr)
+            and isinstance(n.value, ast.Constant)
+            and isinstance(n.value.value, str)
+        ):
             parts.append("DOC")
             return
         parts.append(type(n).__name__)
@@ -423,8 +541,11 @@ def _is_stub_body(body: list[ast.stmt]) -> bool:
         return True
     stmts = body
     # Skip leading docstring
-    if (isinstance(stmts[0], ast.Expr) and isinstance(stmts[0].value, ast.Constant)
-            and isinstance(stmts[0].value.value, str)):
+    if (
+        isinstance(stmts[0], ast.Expr)
+        and isinstance(stmts[0].value, ast.Constant)
+        and isinstance(stmts[0].value.value, str)
+    ):
         stmts = stmts[1:]
     if not stmts:
         return True  # docstring only
@@ -432,14 +553,20 @@ def _is_stub_body(body: list[ast.stmt]) -> bool:
         s = stmts[0]
         if isinstance(s, ast.Pass):
             return True
-        if isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant) and s.value.value is ...:
+        if (
+            isinstance(s, ast.Expr)
+            and isinstance(s.value, ast.Constant)
+            and s.value.value is ...
+        ):
             return True
         if isinstance(s, ast.Raise):
             return True  # abstract-like raise NotImplementedError
     return False
 
 
-def _has_decorator(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, names: set[str]) -> bool:
+def _has_decorator(
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, names: set[str]
+) -> bool:
     """Check if a node has any decorator with the given names."""
     for dec in node.decorator_list:
         if isinstance(dec, ast.Name) and dec.id in names:
@@ -458,9 +585,11 @@ def _has_decorator(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, 
 # Cross-file data collected during first pass
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FileData:
     """Per-file metadata collected during scanning for cross-file analysis."""
+
     filepath: str
     toplevel_defs: int = 0
     total_lines: int = 0
@@ -468,16 +597,24 @@ class FileData:
     # func_key -> (filepath, func_name, line, normalized_hash, line_count)
     func_signatures: list[tuple[str, str, int, str, int]] = field(default_factory=list)
     # method -> {external_class: count}
-    method_external_accesses: list[tuple[str, int, str, dict[str, int]]] = field(default_factory=list)
+    method_external_accesses: list[tuple[str, int, str, dict[str, int]]] = field(
+        default_factory=list
+    )
     # class names defined in this file
     class_names: list[str] = field(default_factory=list)
     # --- Tier 2/3 additions ---
-    class_bases: dict[str, list[str]] = field(default_factory=dict)  # class -> base names
+    class_bases: dict[str, list[str]] = field(
+        default_factory=dict
+    )  # class -> base names
     class_lines: dict[str, int] = field(default_factory=dict)  # class -> line number
     class_info: list[ClassInfo] = field(default_factory=list)  # detailed class data
-    defined_functions: set[str] = field(default_factory=set)  # all func/method names defined
+    defined_functions: set[str] = field(
+        default_factory=set
+    )  # all func/method names defined
     called_functions: set[str] = field(default_factory=set)  # all func names called
-    abstract_classes: set[str] = field(default_factory=set)  # classes with ABC or abstract methods
+    abstract_classes: set[str] = field(
+        default_factory=set
+    )  # classes with ABC or abstract methods
 
 
 # ---------------------------------------------------------------------------
@@ -502,21 +639,42 @@ class SmellDetector(ast.NodeVisitor):
         self._string_concat_lines: set[int] = set()
 
         # Cross-file data
-        self.file_data = FileData(filepath=filepath, total_lines=len(source.splitlines()))
+        self.file_data = FileData(
+            filepath=filepath, total_lines=len(source.splitlines())
+        )
 
         # Tier 2/3: class-level collection
         self._current_class_info: ClassInfo | None = None
-        self._class_all_fields: dict[str, list[str]] = defaultdict(list)  # class -> all self.x fields
-        self._class_methods_fields: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+        self._class_all_fields: dict[str, list[str]] = defaultdict(
+            list
+        )  # class -> all self.x fields
+        self._class_methods_fields: dict[str, dict[str, set[str]]] = defaultdict(
+            lambda: defaultdict(set)
+        )
 
-    def _add(self, line: int, pattern: str, name: str, severity: str, message: str, category: str):
+    def _add(
+        self,
+        line: int,
+        pattern: str,
+        name: str,
+        severity: str,
+        message: str,
+        category: str,
+    ):
         rd = _RULE_REGISTRY.get(pattern)
-        self.findings.append(Finding(
-            file=self.filepath, line=line, pattern=pattern,
-            name=name, severity=severity, message=message, category=category,
-            rule_id=rd.rule_id if rd else "",
-            scope=rd.scope if rd else "file",
-        ))
+        self.findings.append(
+            Finding(
+                file=self.filepath,
+                line=line,
+                pattern=pattern,
+                name=name,
+                severity=severity,
+                message=message,
+                category=category,
+                rule_id=rd.rule_id if rd else "",
+                scope=rd.scope if rd else "file",
+            )
+        )
 
     # =======================================================================
     # State & Immutability
@@ -530,9 +688,14 @@ class SmellDetector(ast.NodeVisitor):
             and len(node.args.args) == 2
         ):
             attr = node.name[4:]
-            self._add(node.lineno, "#001", "Remove Setters", "warning",
-                      f"Setter `{node.name}` -- consider making `{attr}` a constructor param or using @dataclass(frozen=True)",
-                      "state")
+            self._add(
+                node.lineno,
+                "#001",
+                "Remove Setters",
+                "warning",
+                f"Setter `{node.name}` -- consider making `{attr}` a constructor param or using @dataclass(frozen=True)",
+                "state",
+            )
 
     def _check_half_built_init(self, node: ast.FunctionDef):
         """#016 -- Build With The Essence: __init__ setting attrs to None."""
@@ -593,10 +756,15 @@ class SmellDetector(ast.NodeVisitor):
                     ):
                         public_attrs.append(target.attr)
         if len(public_attrs) >= 3:
-            self._add(node.lineno, "#009", "Protect Public Attributes", "info",
-                      f"Class `{self._class_stack[-1].name}` exposes {len(public_attrs)} public attrs: "
-                      f"{', '.join(public_attrs[:5])}{'...' if len(public_attrs) > 5 else ''}",
-                      "state")
+            self._add(
+                node.lineno,
+                "#009",
+                "Protect Public Attributes",
+                "info",
+                f"Class `{self._class_stack[-1].name}` exposes {len(public_attrs)} public attrs: "
+                f"{', '.join(public_attrs[:5])}{'...' if len(public_attrs) > 5 else ''}",
+                "state",
+            )
 
     # =======================================================================
     # Functions & Methods
@@ -606,17 +774,27 @@ class SmellDetector(ast.NodeVisitor):
         """#002 -- Extract Method: function too long."""
         lines = _lines_of(node)
         if lines > MAX_FUNCTION_LINES:
-            self._add(node.lineno, "#002", "Extract Method", "warning",
-                      f"`{node.name}` is {lines} lines (threshold: {MAX_FUNCTION_LINES})",
-                      "functions")
+            self._add(
+                node.lineno,
+                "#002",
+                "Extract Method",
+                "warning",
+                f"`{node.name}` is {lines} lines (threshold: {MAX_FUNCTION_LINES})",
+                "functions",
+            )
 
     def _check_deep_nesting(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#039 -- Guard Clauses: deep nesting."""
         depth = _nesting_depth(node)
         if depth > MAX_NESTING_DEPTH:
-            self._add(node.lineno, "#039", "Replace Nested Conditional with Guard Clauses", "warning",
-                      f"`{node.name}` has nesting depth {depth} (threshold: {MAX_NESTING_DEPTH})",
-                      "control")
+            self._add(
+                node.lineno,
+                "#039",
+                "Replace Nested Conditional with Guard Clauses",
+                "warning",
+                f"`{node.name}` has nesting depth {depth} (threshold: {MAX_NESTING_DEPTH})",
+                "control",
+            )
 
     def _check_too_many_params(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#034 -- Reify Parameters: long parameter list."""
@@ -625,9 +803,14 @@ class SmellDetector(ast.NodeVisitor):
         if self._class_stack and args.args and args.args[0].arg in ("self", "cls"):
             count -= 1
         if count > MAX_PARAMS:
-            self._add(node.lineno, "#034", "Reify Parameters", "warning",
-                      f"`{node.name}` has {count} parameters (threshold: {MAX_PARAMS})",
-                      "functions")
+            self._add(
+                node.lineno,
+                "#034",
+                "Reify Parameters",
+                "warning",
+                f"`{node.name}` has {count} parameters (threshold: {MAX_PARAMS})",
+                "functions",
+            )
 
     def _check_generic_names(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#006 -- Rename Result Variables: generic names."""
@@ -635,9 +818,14 @@ class SmellDetector(ast.NodeVisitor):
             if isinstance(child, ast.Assign):
                 for name in _get_assigned_names(child.targets):
                     if name in GENERIC_NAMES:
-                        self._add(child.lineno, "#006", "Rename Result Variables", "info",
-                                  f"Generic variable name `{name}` in `{node.name}` -- use a descriptive name",
-                                  "functions")
+                        self._add(
+                            child.lineno,
+                            "#006",
+                            "Rename Result Variables",
+                            "info",
+                            f"Generic variable name `{name}` in `{node.name}` -- use a descriptive name",
+                            "functions",
+                        )
 
     def _check_cqs_violation(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#041 -- Separate Query from Modifier (CQS)."""
@@ -648,21 +836,39 @@ class SmellDetector(ast.NodeVisitor):
         for child in ast.walk(node):
             if isinstance(child, ast.Assign):
                 for t in child.targets:
-                    if isinstance(t, ast.Attribute) and isinstance(t.value, ast.Name) and t.value.id == "self":
+                    if (
+                        isinstance(t, ast.Attribute)
+                        and isinstance(t.value, ast.Name)
+                        and t.value.id == "self"
+                    ):
                         has_self_assignment = True
-            if isinstance(child, ast.Return) and child.value is not None and not _is_none(child.value):
+            if (
+                isinstance(child, ast.Return)
+                and child.value is not None
+                and not _is_none(child.value)
+            ):
                 has_return_value = True
         if has_self_assignment and has_return_value:
-            self._add(node.lineno, "#041", "Separate Query from Modifier", "info",
-                      f"`{node.name}` both mutates self and returns a value -- consider splitting",
-                      "functions")
+            self._add(
+                node.lineno,
+                "#041",
+                "Separate Query from Modifier",
+                "info",
+                f"`{node.name}` both mutates self and returns a value -- consider splitting",
+                "functions",
+            )
 
     def _check_excessive_decorators(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#033 -- Strip Annotations: too many decorators."""
         if len(node.decorator_list) > MAX_DECORATORS:
-            self._add(node.lineno, "#033", "Strip Annotations", "info",
-                      f"`{node.name}` has {len(node.decorator_list)} decorators (threshold: {MAX_DECORATORS})",
-                      "hygiene")
+            self._add(
+                node.lineno,
+                "#033",
+                "Strip Annotations",
+                "info",
+                f"`{node.name}` has {len(node.decorator_list)} decorators (threshold: {MAX_DECORATORS})",
+                "hygiene",
+            )
 
     def _check_unused_params(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#064 -- Remove Unused Parameters."""
@@ -692,9 +898,14 @@ class SmellDetector(ast.NodeVisitor):
         # Also skip _-prefixed params (convention for intentionally unused)
         unused = {p for p in unused if not p.startswith("_")}
         if unused:
-            self._add(node.lineno, "#064", "Remove Unused Parameters", "warning",
-                      f"`{node.name}` has unused parameters: {', '.join(sorted(unused))}",
-                      "functions")
+            self._add(
+                node.lineno,
+                "#064",
+                "Remove Unused Parameters",
+                "warning",
+                f"`{node.name}` has unused parameters: {', '.join(sorted(unused))}",
+                "functions",
+            )
 
     def _check_long_lambda(self, node: ast.Lambda):
         """#066 -- Replace Long Lambda with Function."""
@@ -703,9 +914,14 @@ class SmellDetector(ast.NodeVisitor):
         except Exception:
             return
         if len(source) > MAX_LAMBDA_LENGTH:
-            self._add(node.lineno, "#066", "Replace Long Lambda with Function", "info",
-                      f"Lambda is {len(source)} chars (threshold: {MAX_LAMBDA_LENGTH}) -- use a named function",
-                      "functions")
+            self._add(
+                node.lineno,
+                "#066",
+                "Replace Long Lambda with Function",
+                "info",
+                f"Lambda is {len(source)} chars (threshold: {MAX_LAMBDA_LENGTH}) -- use a named function",
+                "functions",
+            )
 
     # =======================================================================
     # Type Design
@@ -718,29 +934,48 @@ class SmellDetector(ast.NodeVisitor):
         while current is not None:
             if isinstance(current, ast.If):
                 test = current.test
-                if (isinstance(test, ast.Call)
-                        and isinstance(test.func, ast.Name)
-                        and test.func.id == "isinstance"):
+                if (
+                    isinstance(test, ast.Call)
+                    and isinstance(test.func, ast.Name)
+                    and test.func.id == "isinstance"
+                ):
                     isinstance_count += 1
-                current = current.orelse[0] if (current.orelse and isinstance(current.orelse[0], ast.If)) else None
+                current = (
+                    current.orelse[0]
+                    if (current.orelse and isinstance(current.orelse[0], ast.If))
+                    else None
+                )
             else:
                 break
         if isinstance_count >= 2:
-            self._add(node.lineno, "#014", "Replace IF with Polymorphism", "warning",
-                      f"isinstance chain with {isinstance_count} branches -- consider polymorphism or Protocol",
-                      "types")
+            self._add(
+                node.lineno,
+                "#014",
+                "Replace IF with Polymorphism",
+                "warning",
+                f"isinstance chain with {isinstance_count} branches -- consider polymorphism or Protocol",
+                "types",
+            )
 
     def _check_lazy_class(self, node: ast.ClassDef):
         """#069 -- Remove Lazy Class: class too small to justify existence."""
         # Skip special base classes
         for base in node.bases:
             if isinstance(base, ast.Name) and base.id in (
-                "ABC", "Protocol", "Exception", "Enum", "IntEnum", "StrEnum",
-                "TypedDict", "NamedTuple",
+                "ABC",
+                "Protocol",
+                "Exception",
+                "Enum",
+                "IntEnum",
+                "StrEnum",
+                "TypedDict",
+                "NamedTuple",
             ):
                 return
             if isinstance(base, ast.Attribute) and base.attr in (
-                "ABC", "Protocol", "Exception",
+                "ABC",
+                "Protocol",
+                "Exception",
             ):
                 return
         if _has_decorator(node, {"dataclass", "dataclasses"}):
@@ -756,17 +991,28 @@ class SmellDetector(ast.NodeVisitor):
                     non_dunder_count += 1
                 if stmt.name == "__init__":
                     for child in ast.walk(stmt):
-                        if (isinstance(child, ast.Attribute)
-                                and isinstance(child.value, ast.Name)
-                                and child.value.id == "self"
-                                and isinstance(child.ctx, ast.Store)):
+                        if (
+                            isinstance(child, ast.Attribute)
+                            and isinstance(child.value, ast.Name)
+                            and child.value.id == "self"
+                            and isinstance(child.ctx, ast.Store)
+                        ):
                             field_count += 1
         # A class is lazy if it has very few methods and fields
-        if non_dunder_count < MIN_LAZY_CLASS_METHODS and field_count < 2 and method_count > 0:
-            self._add(node.lineno, "#069", "Remove Lazy Class", "info",
-                      f"Class `{node.name}` has {non_dunder_count} non-dunder methods and {field_count} fields "
-                      f"-- consider inlining or merging",
-                      "types")
+        if (
+            non_dunder_count < MIN_LAZY_CLASS_METHODS
+            and field_count < 2
+            and method_count > 0
+        ):
+            self._add(
+                node.lineno,
+                "#069",
+                "Remove Lazy Class",
+                "info",
+                f"Class `{node.name}` has {non_dunder_count} non-dunder methods and {field_count} fields "
+                f"-- consider inlining or merging",
+                "types",
+            )
 
     def _check_temporary_fields(self, node: ast.ClassDef):
         """#070 -- Remove Temporary Field: fields used in few methods."""
@@ -777,10 +1023,12 @@ class SmellDetector(ast.NodeVisitor):
                 continue
             if stmt.name == "__init__":
                 for child in ast.walk(stmt):
-                    if (isinstance(child, ast.Attribute)
-                            and isinstance(child.value, ast.Name)
-                            and child.value.id == "self"
-                            and isinstance(child.ctx, ast.Store)):
+                    if (
+                        isinstance(child, ast.Attribute)
+                        and isinstance(child.value, ast.Name)
+                        and child.value.id == "self"
+                        and isinstance(child.ctx, ast.Store)
+                    ):
                         init_fields.add(child.attr)
             elif not stmt.name.startswith("__"):
                 methods.append(stmt)
@@ -792,18 +1040,25 @@ class SmellDetector(ast.NodeVisitor):
             usage_count = 0
             for method in methods:
                 for child in ast.walk(method):
-                    if (isinstance(child, ast.Attribute)
-                            and isinstance(child.value, ast.Name)
-                            and child.value.id == "self"
-                            and child.attr == field_name):
+                    if (
+                        isinstance(child, ast.Attribute)
+                        and isinstance(child.value, ast.Name)
+                        and child.value.id == "self"
+                        and child.attr == field_name
+                    ):
                         usage_count += 1
                         break
             ratio = usage_count / len(methods)
             if ratio < TEMP_FIELD_USAGE_RATIO:
-                self._add(node.lineno, "#070", "Remove Temporary Field", "info",
-                          f"`{node.name}.{field_name}` used in {usage_count}/{len(methods)} methods "
-                          f"({ratio:.0%}) -- consider local variable or parameter",
-                          "types")
+                self._add(
+                    node.lineno,
+                    "#070",
+                    "Remove Temporary Field",
+                    "info",
+                    f"`{node.name}.{field_name}` used in {usage_count}/{len(methods)} methods "
+                    f"({ratio:.0%}) -- consider local variable or parameter",
+                    "types",
+                )
 
     # =======================================================================
     # Control Flow
@@ -812,13 +1067,20 @@ class SmellDetector(ast.NodeVisitor):
     def _check_loop_append(self, node: ast.For | ast.While):
         """#040 -- Replace Loop with Pipeline."""
         for stmt in ast.walk(node):
-            if (isinstance(stmt, ast.Expr)
-                    and isinstance(stmt.value, ast.Call)
-                    and isinstance(stmt.value.func, ast.Attribute)
-                    and stmt.value.func.attr == "append"):
-                self._add(node.lineno, "#040", "Replace Loop with Pipeline", "info",
-                          "Loop with `.append()` -- consider list comprehension or generator",
-                          "control")
+            if (
+                isinstance(stmt, ast.Expr)
+                and isinstance(stmt.value, ast.Call)
+                and isinstance(stmt.value.func, ast.Attribute)
+                and stmt.value.func.attr == "append"
+            ):
+                self._add(
+                    node.lineno,
+                    "#040",
+                    "Replace Loop with Pipeline",
+                    "info",
+                    "Loop with `.append()` -- consider list comprehension or generator",
+                    "control",
+                )
                 return
 
     def _check_control_flag(self, node: ast.For | ast.While):
@@ -833,11 +1095,13 @@ class SmellDetector(ast.NodeVisitor):
         for stmt in parent_body:
             if stmt is node:
                 break
-            if (isinstance(stmt, ast.Assign)
-                    and len(stmt.targets) == 1
-                    and isinstance(stmt.targets[0], ast.Name)
-                    and isinstance(stmt.value, ast.Constant)
-                    and stmt.value.value is False):
+            if (
+                isinstance(stmt, ast.Assign)
+                and len(stmt.targets) == 1
+                and isinstance(stmt.targets[0], ast.Name)
+                and isinstance(stmt.value, ast.Constant)
+                and stmt.value.value is False
+            ):
                 flag_names.add(stmt.targets[0].id)
 
         if not flag_names:
@@ -847,19 +1111,33 @@ class SmellDetector(ast.NodeVisitor):
             if isinstance(child, ast.If):
                 test = child.test
                 if isinstance(test, ast.Name) and test.id in flag_names:
-                    self._add(node.lineno, "#055", "Replace Control Flag with Break", "info",
-                              f"Boolean flag `{test.id}` controls loop -- use `break`/`return`/`any()`",
-                              "control")
+                    self._add(
+                        node.lineno,
+                        "#055",
+                        "Replace Control Flag with Break",
+                        "info",
+                        f"Boolean flag `{test.id}` controls loop -- use `break`/`return`/`any()`",
+                        "control",
+                    )
                     return
                 if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
-                    if isinstance(test.operand, ast.Name) and test.operand.id in flag_names:
-                        self._add(node.lineno, "#055", "Replace Control Flag with Break", "info",
-                                  f"Boolean flag `{test.operand.id}` controls loop -- use `break`/`return`/`any()`",
-                                  "control")
+                    if (
+                        isinstance(test.operand, ast.Name)
+                        and test.operand.id in flag_names
+                    ):
+                        self._add(
+                            node.lineno,
+                            "#055",
+                            "Replace Control Flag with Break",
+                            "info",
+                            f"Boolean flag `{test.operand.id}` controls loop -- use `break`/`return`/`any()`",
+                            "control",
+                        )
                         return
 
     def _check_complex_boolean(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#042 -- Decompose Conditional."""
+
         def _count_bool_ops(expr: ast.AST) -> int:
             if isinstance(expr, ast.BoolOp):
                 count = len(expr.values) - 1
@@ -872,9 +1150,14 @@ class SmellDetector(ast.NodeVisitor):
             if isinstance(child, ast.If):
                 ops = _count_bool_ops(child.test)
                 if ops >= 3:
-                    self._add(child.lineno, "#042", "Decompose Conditional", "warning",
-                              f"Complex boolean ({ops} operators) in `{node.name}` -- extract to descriptive function",
-                              "control")
+                    self._add(
+                        child.lineno,
+                        "#042",
+                        "Decompose Conditional",
+                        "warning",
+                        f"Complex boolean ({ops} operators) in `{node.name}` -- extract to descriptive function",
+                        "control",
+                    )
                     return
 
     def _check_missing_else(self, node: ast.If):
@@ -891,9 +1174,14 @@ class SmellDetector(ast.NodeVisitor):
             else:
                 return  # has an else clause -- fine
         if has_elif and branch_count >= 2:
-            self._add(node.lineno, "#068", "Add Default Else Branch", "info",
-                      f"if/elif chain with {branch_count} branches but no default `else`",
-                      "control")
+            self._add(
+                node.lineno,
+                "#068",
+                "Add Default Else Branch",
+                "info",
+                f"if/elif chain with {branch_count} branches but no default `else`",
+                "control",
+            )
 
     def _check_long_comprehension(self, node: ast.AST):
         """#067 -- Simplify Complex Comprehension: too many nested generators."""
@@ -904,14 +1192,24 @@ class SmellDetector(ast.NodeVisitor):
                     ast.SetComp: "Set comprehension",
                     ast.GeneratorExp: "Generator expression",
                 }.get(type(node), "Comprehension")
-                self._add(node.lineno, "#067", "Simplify Complex Comprehension", "info",
-                          f"{kind} has {len(node.generators)} nested loops -- simplify or use explicit loops",
-                          "control")
+                self._add(
+                    node.lineno,
+                    "#067",
+                    "Simplify Complex Comprehension",
+                    "info",
+                    f"{kind} has {len(node.generators)} nested loops -- simplify or use explicit loops",
+                    "control",
+                )
         elif isinstance(node, ast.DictComp):
             if len(node.generators) > MAX_COMPREHENSION_GENERATORS:
-                self._add(node.lineno, "#067", "Simplify Complex Comprehension", "info",
-                          f"Dict comprehension has {len(node.generators)} nested loops -- simplify",
-                          "control")
+                self._add(
+                    node.lineno,
+                    "#067",
+                    "Simplify Complex Comprehension",
+                    "info",
+                    f"Dict comprehension has {len(node.generators)} nested loops -- simplify",
+                    "control",
+                )
 
     # =======================================================================
     # Architecture
@@ -922,10 +1220,19 @@ class SmellDetector(ast.NodeVisitor):
         for stmt in node.body:
             if isinstance(stmt, ast.Assign):
                 for t in stmt.targets:
-                    if isinstance(t, ast.Name) and t.id == "_instance" and _is_none(stmt.value):
-                        self._add(node.lineno, "#018", "Replace Singleton", "warning",
-                                  f"Class `{node.name}` uses Singleton pattern -- consider dependency injection",
-                                  "architecture")
+                    if (
+                        isinstance(t, ast.Name)
+                        and t.id == "_instance"
+                        and _is_none(stmt.value)
+                    ):
+                        self._add(
+                            node.lineno,
+                            "#018",
+                            "Replace Singleton",
+                            "warning",
+                            f"Class `{node.name}` uses Singleton pattern -- consider dependency injection",
+                            "architecture",
+                        )
                         return
 
     def _check_global_mutable(self, node: ast.Assign):
@@ -935,19 +1242,31 @@ class SmellDetector(ast.NodeVisitor):
         if isinstance(node.value, (ast.Call, ast.Dict, ast.List, ast.Set)):
             for name in _get_assigned_names(node.targets):
                 if not name.startswith("_") and name != name.upper():
-                    self._add(node.lineno, "#024", "Replace Global Variables with DI", "info",
-                              f"Module-level mutable `{name}` -- consider dependency injection",
-                              "architecture")
+                    self._add(
+                        node.lineno,
+                        "#024",
+                        "Replace Global Variables with DI",
+                        "info",
+                        f"Module-level mutable `{name}` -- consider dependency injection",
+                        "architecture",
+                    )
 
     def _check_constant_without_final(self, node: ast.Assign):
         """#008 -- Convert Variables to Constants."""
         if self._class_stack or self._func_stack:
             return
         for name in _get_assigned_names(node.targets):
-            if name == name.upper() and name.startswith(tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ")):
-                self._add(node.lineno, "#008", "Convert Variables to Constants", "info",
-                          f"`{name}` is UPPER_CASE but not annotated with `typing.Final`",
-                          "state")
+            if name == name.upper() and name.startswith(
+                tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+            ):
+                self._add(
+                    node.lineno,
+                    "#008",
+                    "Convert Variables to Constants",
+                    "info",
+                    f"`{name}` is UPPER_CASE but not annotated with `typing.Final`",
+                    "state",
+                )
 
     def _check_sequential_ids(self, node: ast.ClassDef):
         """#028 -- Replace Sequential IDs."""
@@ -955,11 +1274,18 @@ class SmellDetector(ast.NodeVisitor):
             if isinstance(stmt, ast.Assign):
                 for t in stmt.targets:
                     if isinstance(t, ast.Name) and re.match(
-                        r"^_?(counter|next_id|id_counter|sequence|seq_num|auto_increment)", t.id, re.IGNORECASE
+                        r"^_?(counter|next_id|id_counter|sequence|seq_num|auto_increment)",
+                        t.id,
+                        re.IGNORECASE,
                     ):
-                        self._add(node.lineno, "#028", "Replace Sequential IDs", "info",
-                                  f"Class `{node.name}` uses sequential ID pattern (`{t.id}`) -- consider UUID",
-                                  "architecture")
+                        self._add(
+                            node.lineno,
+                            "#028",
+                            "Replace Sequential IDs",
+                            "info",
+                            f"Class `{node.name}` uses sequential ID pattern (`{t.id}`) -- consider UUID",
+                            "architecture",
+                        )
                         return
 
     def _check_error_codes(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
@@ -969,18 +1295,29 @@ class SmellDetector(ast.NodeVisitor):
         for child in ast.walk(node):
             if isinstance(child, ast.Return) and child.value is not None:
                 total_returns += 1
-                if isinstance(child.value, ast.Constant) and isinstance(child.value.value, int):
+                if isinstance(child.value, ast.Constant) and isinstance(
+                    child.value.value, int
+                ):
                     if isinstance(child.value.value, bool):
                         continue
                     return_ints.add(child.value.value)
-                elif isinstance(child.value, ast.UnaryOp) and isinstance(child.value.op, ast.USub):
-                    if isinstance(child.value.operand, ast.Constant) and isinstance(child.value.operand.value, int):
+                elif isinstance(child.value, ast.UnaryOp) and isinstance(
+                    child.value.op, ast.USub
+                ):
+                    if isinstance(child.value.operand, ast.Constant) and isinstance(
+                        child.value.operand.value, int
+                    ):
                         return_ints.add(-child.value.operand.value)
         if len(return_ints) >= 2 and total_returns >= 2:
             if return_ints.issubset({-1, 0, 1, -2, 2}):
-                self._add(node.lineno, "#051", "Replace Error Codes with Exceptions", "warning",
-                          f"`{node.name}` returns status codes {sorted(return_ints)} -- use exceptions",
-                          "architecture")
+                self._add(
+                    node.lineno,
+                    "#051",
+                    "Replace Error Codes with Exceptions",
+                    "warning",
+                    f"`{node.name}` returns status codes {sorted(return_ints)} -- use exceptions",
+                    "architecture",
+                )
 
     def _check_law_of_demeter(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#054 -- Law of Demeter: chained .attr.attr.attr access."""
@@ -991,7 +1328,11 @@ class SmellDetector(ast.NodeVisitor):
                 while isinstance(current, ast.Attribute):
                     depth += 1
                     current = current.value
-                if depth >= 3 and isinstance(current, ast.Name) and current.id != "self":
+                if (
+                    depth >= 3
+                    and isinstance(current, ast.Name)
+                    and current.id != "self"
+                ):
                     parts = [child.attr]
                     inner = child.value
                     while isinstance(inner, ast.Attribute):
@@ -1000,9 +1341,14 @@ class SmellDetector(ast.NodeVisitor):
                     if isinstance(inner, ast.Name):
                         parts.append(inner.id)
                     chain = ".".join(reversed(parts))
-                    self._add(child.lineno, "#054", "Law of Demeter", "info",
-                              f"Chain `{chain}` ({depth + 1} deep) in `{node.name}` -- introduce a delegate",
-                              "architecture")
+                    self._add(
+                        child.lineno,
+                        "#054",
+                        "Law of Demeter",
+                        "info",
+                        f"Chain `{chain}` ({depth + 1} deep) in `{node.name}` -- introduce a delegate",
+                        "architecture",
+                    )
                     return
 
     # =======================================================================
@@ -1012,17 +1358,27 @@ class SmellDetector(ast.NodeVisitor):
     def _check_bare_except(self, node: ast.ExceptHandler):
         """#004 -- Remove Unhandled Exceptions."""
         is_bare = node.type is None
-        is_broad = (isinstance(node.type, ast.Name) and node.type.id == "Exception")
-        body_is_pass = (len(node.body) == 1 and isinstance(node.body[0], ast.Pass))
+        is_broad = isinstance(node.type, ast.Name) and node.type.id == "Exception"
+        body_is_pass = len(node.body) == 1 and isinstance(node.body[0], ast.Pass)
 
         if is_bare:
-            self._add(node.lineno, "#004", "Remove Unhandled Exceptions", "error",
-                      "Bare `except:` -- always catch specific exceptions",
-                      "hygiene")
+            self._add(
+                node.lineno,
+                "#004",
+                "Remove Unhandled Exceptions",
+                "error",
+                "Bare `except:` -- always catch specific exceptions",
+                "hygiene",
+            )
         elif is_broad and body_is_pass:
-            self._add(node.lineno, "#004", "Remove Unhandled Exceptions", "warning",
-                      "`except Exception: pass` -- silently swallowing all errors",
-                      "hygiene")
+            self._add(
+                node.lineno,
+                "#004",
+                "Remove Unhandled Exceptions",
+                "warning",
+                "`except Exception: pass` -- silently swallowing all errors",
+                "hygiene",
+            )
 
     def _check_empty_catch(self, node: ast.ExceptHandler):
         """#065 -- Remove Empty Catch Block: except SomeError: pass."""
@@ -1040,9 +1396,14 @@ class SmellDetector(ast.NodeVisitor):
                 exc_name = node.type.attr
             else:
                 exc_name = ast.dump(node.type)
-            self._add(node.lineno, "#065", "Remove Empty Catch Block", "warning",
-                      f"`except {exc_name}: pass` -- silently swallowing `{exc_name}`",
-                      "hygiene")
+            self._add(
+                node.lineno,
+                "#065",
+                "Remove Empty Catch Block",
+                "warning",
+                f"`except {exc_name}: pass` -- silently swallowing `{exc_name}`",
+                "hygiene",
+            )
 
     def _check_magic_numbers(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#003 -- Extract Constant: magic numbers."""
@@ -1052,11 +1413,15 @@ class SmellDetector(ast.NodeVisitor):
             if d is not None:
                 default_nodes.add(id(d))
         for child in ast.walk(node):
-            if isinstance(child, ast.Return) and isinstance(getattr(child, "value", None), ast.Constant):
+            if isinstance(child, ast.Return) and isinstance(
+                getattr(child, "value", None), ast.Constant
+            ):
                 return_lines.add(child.lineno)
 
         for child in ast.walk(node):
-            if isinstance(child, ast.Constant) and isinstance(child.value, (int, float)):
+            if isinstance(child, ast.Constant) and isinstance(
+                child.value, (int, float)
+            ):
                 if child.value in MAGIC_NUMBER_WHITELIST:
                     continue
                 if id(child) in default_nodes:
@@ -1065,9 +1430,14 @@ class SmellDetector(ast.NodeVisitor):
                     continue
                 if isinstance(child.value, int) and -10 <= child.value <= 10:
                     continue
-                self._add(child.lineno, "#003", "Extract Constant", "info",
-                          f"Magic number `{child.value}` -- extract to a named constant",
-                          "hygiene")
+                self._add(
+                    child.lineno,
+                    "#003",
+                    "Extract Constant",
+                    "info",
+                    f"Magic number `{child.value}` -- extract to a named constant",
+                    "hygiene",
+                )
 
     def _check_string_concat(self, node: ast.BinOp):
         """#036 -- Replace String Concatenation."""
@@ -1082,9 +1452,14 @@ class SmellDetector(ast.NodeVisitor):
             current = current.left
         if parts >= 3:
             self._string_concat_lines.add(node.lineno)
-            self._add(node.lineno, "#036", "Replace String Concatenation", "info",
-                      "Multiple string concatenations -- consider f-string or triple-quoted string",
-                      "hygiene")
+            self._add(
+                node.lineno,
+                "#036",
+                "Replace String Concatenation",
+                "info",
+                "Multiple string concatenations -- consider f-string or triple-quoted string",
+                "hygiene",
+            )
 
     # =======================================================================
     # Python Idioms
@@ -1094,22 +1469,34 @@ class SmellDetector(ast.NodeVisitor):
         """#057 -- Replace Mutable Default Arguments."""
         for default in node.args.defaults + node.args.kw_defaults:
             if default is not None and _is_mutable_literal(default):
-                self._add(node.lineno, "#057", "Replace Mutable Default Arguments", "error",
-                          f"`{node.name}` has mutable default argument -- use `None` sentinel",
-                          "idioms")
+                self._add(
+                    node.lineno,
+                    "#057",
+                    "Replace Mutable Default Arguments",
+                    "error",
+                    f"`{node.name}` has mutable default argument -- use `None` sentinel",
+                    "idioms",
+                )
 
     def _check_open_without_with(self, node: ast.Call):
         """#058 -- Use Context Managers."""
         if isinstance(node.func, ast.Name) and node.func.id == "open":
             self._open_calls_outside_with.append((node.lineno, "open"))
 
-    def _check_cyclomatic_complexity(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
+    def _check_cyclomatic_complexity(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ):
         """Cyclomatic Complexity check."""
         cc = _cyclomatic_complexity(node)
         if cc > MAX_CYCLOMATIC_COMPLEXITY:
-            self._add(node.lineno, "#CC", "Reduce Cyclomatic Complexity", "warning",
-                      f"`{node.name}` has CC={cc} (threshold: {MAX_CYCLOMATIC_COMPLEXITY}) -- split into smaller functions",
-                      "functions")
+            self._add(
+                node.lineno,
+                "#CC",
+                "Reduce Cyclomatic Complexity",
+                "warning",
+                f"`{node.name}` has CC={cc} (threshold: {MAX_CYCLOMATIC_COMPLEXITY}) -- split into smaller functions",
+                "functions",
+            )
 
     def _check_index_access(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#062 -- Use Unpacking Instead of Indexing."""
@@ -1125,9 +1512,14 @@ class SmellDetector(ast.NodeVisitor):
         for var_name, indices in index_accesses.items():
             unique = sorted(set(indices))
             if len(unique) >= 3 and unique[:3] == [0, 1, 2]:
-                self._add(node.lineno, "#062", "Use Unpacking Instead of Indexing", "info",
-                          f"`{var_name}[0]`, `{var_name}[1]`, `{var_name}[2]`... in `{node.name}` -- use unpacking",
-                          "idioms")
+                self._add(
+                    node.lineno,
+                    "#062",
+                    "Use Unpacking Instead of Indexing",
+                    "info",
+                    f"`{var_name}[0]`, `{var_name}[1]`, `{var_name}[2]`... in `{node.name}` -- use unpacking",
+                    "idioms",
+                )
 
     def _check_return_none_or_value(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
         """#029 -- Replace NULL with Collection."""
@@ -1137,21 +1529,32 @@ class SmellDetector(ast.NodeVisitor):
             if isinstance(child, ast.Return):
                 if child.value is None or _is_none(child.value):
                     returns_none = True
-                elif isinstance(child.value, (ast.List, ast.ListComp, ast.GeneratorExp)):
+                elif isinstance(
+                    child.value, (ast.List, ast.ListComp, ast.GeneratorExp)
+                ):
                     returns_value = True
                 else:
                     returns_value = True
         if returns_none and returns_value:
             for child in ast.walk(node):
-                if (isinstance(child, ast.Return)
-                        and child.value is not None
-                        and isinstance(child.value, (ast.List, ast.ListComp))):
-                    self._add(node.lineno, "#029", "Replace NULL with Collection", "info",
-                              f"`{node.name}` returns both None and a list -- always return empty list",
-                              "types")
+                if (
+                    isinstance(child, ast.Return)
+                    and child.value is not None
+                    and isinstance(child.value, (ast.List, ast.ListComp))
+                ):
+                    self._add(
+                        node.lineno,
+                        "#029",
+                        "Replace NULL with Collection",
+                        "info",
+                        f"`{node.name}` returns both None and a list -- always return empty list",
+                        "types",
+                    )
                     return
 
-    def _check_dead_code_after_return(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
+    def _check_dead_code_after_return(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ):
         """#021 -- Remove Dead Code."""
         terminal = (ast.Return, ast.Raise, ast.Break, ast.Continue)
 
@@ -1159,9 +1562,14 @@ class SmellDetector(ast.NodeVisitor):
             for i, stmt in enumerate(body):
                 if isinstance(stmt, terminal) and i < len(body) - 1:
                     next_stmt = body[i + 1]
-                    self._add(next_stmt.lineno, "#021", "Remove Dead Code", "warning",
-                              f"Unreachable code after `{type(stmt).__name__.lower()}` in `{node.name}`",
-                              "hygiene")
+                    self._add(
+                        next_stmt.lineno,
+                        "#021",
+                        "Remove Dead Code",
+                        "warning",
+                        f"Unreachable code after `{type(stmt).__name__.lower()}` in `{node.name}`",
+                        "hygiene",
+                    )
                     return
                 if isinstance(stmt, (ast.If, ast.For, ast.While, ast.With, ast.Try)):
                     for attr in ("body", "orelse", "finalbody", "handlers"):
@@ -1181,10 +1589,19 @@ class SmellDetector(ast.NodeVisitor):
         if node.name in ("main", "__main__", "cli", "repl", "prompt", "interactive"):
             return
         for child in ast.walk(node):
-            if (isinstance(child, ast.Call) and isinstance(child.func, ast.Name) and child.func.id == "input"):
-                self._add(child.lineno, "#026", "Replace input() Calls", "warning",
-                          f"`input()` in `{node.name}` -- inject data via parameters",
-                          "functions")
+            if (
+                isinstance(child, ast.Call)
+                and isinstance(child.func, ast.Name)
+                and child.func.id == "input"
+            ):
+                self._add(
+                    child.lineno,
+                    "#026",
+                    "Replace input() Calls",
+                    "warning",
+                    f"`input()` in `{node.name}` -- inject data via parameters",
+                    "functions",
+                )
                 return
 
     def _check_dataclass_candidate(self, node: ast.ClassDef):
@@ -1195,11 +1612,22 @@ class SmellDetector(ast.NodeVisitor):
                 method_names.add(stmt.name)
         if _has_decorator(node, {"dataclass", "dataclasses"}):
             return
-        boilerplate = method_names & {"__init__", "__repr__", "__eq__", "__hash__", "__str__"}
+        boilerplate = method_names & {
+            "__init__",
+            "__repr__",
+            "__eq__",
+            "__hash__",
+            "__str__",
+        }
         if len(boilerplate) >= 2:
-            self._add(node.lineno, "#061", "Replace Class with Dataclass", "info",
-                      f"Class `{node.name}` implements {', '.join(sorted(boilerplate))} -- consider @dataclass",
-                      "idioms")
+            self._add(
+                node.lineno,
+                "#061",
+                "Replace Class with Dataclass",
+                "info",
+                f"Class `{node.name}` implements {', '.join(sorted(boilerplate))} -- consider @dataclass",
+                "idioms",
+            )
 
     def _check_context_manager_class(self, node: ast.ClassDef):
         """#063 -- Replace with contextlib."""
@@ -1208,11 +1636,18 @@ class SmellDetector(ast.NodeVisitor):
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 method_names.add(stmt.name)
         if "__enter__" in method_names and "__exit__" in method_names:
-            real_methods = {m for m in method_names if not m.startswith("__") or m in ("__init__",)}
+            real_methods = {
+                m for m in method_names if not m.startswith("__") or m in ("__init__",)
+            }
             if len(real_methods) <= 2:
-                self._add(node.lineno, "#063", "Replace with contextlib", "info",
-                          f"Class `{node.name}` implements __enter__/__exit__ -- consider @contextmanager",
-                          "idioms")
+                self._add(
+                    node.lineno,
+                    "#063",
+                    "Replace with contextlib",
+                    "info",
+                    f"Class `{node.name}` implements __enter__/__exit__ -- consider @contextmanager",
+                    "idioms",
+                )
 
     # =======================================================================
     # Data collection for cross-file analysis (Tier 2/3)
@@ -1244,7 +1679,12 @@ class SmellDetector(ast.NodeVisitor):
         for cls_name, count in accesses.items():
             if count >= FEATURE_ENVY_THRESHOLD and count > self_accesses:
                 self.file_data.method_external_accesses.append(
-                    (node.name, node.lineno, self._class_stack[-1].name, {cls_name: count})
+                    (
+                        node.name,
+                        node.lineno,
+                        self._class_stack[-1].name,
+                        {cls_name: count},
+                    )
                 )
 
     def _collect_defined_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
@@ -1272,7 +1712,9 @@ class SmellDetector(ast.NodeVisitor):
         self.file_data.class_bases[node.name] = bases
         self.file_data.class_lines[node.name] = node.lineno
 
-        ci = ClassInfo(name=node.name, filepath=self.filepath, line=node.lineno, bases=bases)
+        ci = ClassInfo(
+            name=node.name, filepath=self.filepath, line=node.lineno, bases=bases
+        )
 
         # Check for abstract methods and ABC base
         is_abstract = "ABC" in bases or "ABCMeta" in bases
@@ -1288,19 +1730,23 @@ class SmellDetector(ast.NodeVisitor):
                 # Collect fields accessed by this method
                 fields_accessed: set[str] = set()
                 for child in ast.walk(stmt):
-                    if (isinstance(child, ast.Attribute)
-                            and isinstance(child.value, ast.Name)
-                            and child.value.id == "self"):
+                    if (
+                        isinstance(child, ast.Attribute)
+                        and isinstance(child.value, ast.Name)
+                        and child.value.id == "self"
+                    ):
                         fields_accessed.add(child.attr)
                 ci.methods_using_fields[stmt.name] = fields_accessed
 
                 # Collect init fields
                 if stmt.name == "__init__":
                     for child in ast.walk(stmt):
-                        if (isinstance(child, ast.Attribute)
-                                and isinstance(child.value, ast.Name)
-                                and child.value.id == "self"
-                                and isinstance(child.ctx, ast.Store)):
+                        if (
+                            isinstance(child, ast.Attribute)
+                            and isinstance(child.value, ast.Name)
+                            and child.value.id == "self"
+                            and isinstance(child.ctx, ast.Store)
+                        ):
                             ci.all_fields.append(child.attr)
                             ci.field_count += 1
 
@@ -1309,17 +1755,21 @@ class SmellDetector(ast.NodeVisitor):
                     s = stmt.body[0]
                     if isinstance(s, ast.Return) and isinstance(s.value, ast.Call):
                         func = s.value.func
-                        if (isinstance(func, ast.Attribute)
-                                and isinstance(func.value, ast.Attribute)
-                                and isinstance(func.value.value, ast.Name)
-                                and func.value.value.id == "self"):
+                        if (
+                            isinstance(func, ast.Attribute)
+                            and isinstance(func.value, ast.Attribute)
+                            and isinstance(func.value.value, ast.Name)
+                            and func.value.value.id == "self"
+                        ):
                             ci.delegation_count += 1
                     elif isinstance(s, ast.Expr) and isinstance(s.value, ast.Call):
                         func = s.value.func
-                        if (isinstance(func, ast.Attribute)
-                                and isinstance(func.value, ast.Attribute)
-                                and isinstance(func.value.value, ast.Name)
-                                and func.value.value.id == "self"):
+                        if (
+                            isinstance(func, ast.Attribute)
+                            and isinstance(func.value, ast.Attribute)
+                            and isinstance(func.value.value, ast.Name)
+                            and func.value.value.id == "self"
+                        ):
                             ci.delegation_count += 1
 
         # Collect external class accesses for intimacy/CBO and external method calls for RFC
@@ -1328,18 +1778,24 @@ class SmellDetector(ast.NodeVisitor):
         for stmt in node.body:
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 for child in ast.walk(stmt):
-                    if isinstance(child, ast.Attribute) and isinstance(child.value, ast.Name):
+                    if isinstance(child, ast.Attribute) and isinstance(
+                        child.value, ast.Name
+                    ):
                         if child.value.id != "self" and child.value.id[0:1].isupper():
                             ext_accesses[child.value.id] += 1
                     # Track distinct external method calls: self.x.method() and ClassName.method()
-                    if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute):
+                    if isinstance(child, ast.Call) and isinstance(
+                        child.func, ast.Attribute
+                    ):
                         receiver = child.func.value
                         method_name = child.func.attr
                         if isinstance(receiver, ast.Name) and receiver.id != "self":
                             ext_method_calls.add(f"{receiver.id}.{method_name}")
-                        elif (isinstance(receiver, ast.Attribute)
-                              and isinstance(receiver.value, ast.Name)
-                              and receiver.value.id == "self"):
+                        elif (
+                            isinstance(receiver, ast.Attribute)
+                            and isinstance(receiver.value, ast.Name)
+                            and receiver.value.id == "self"
+                        ):
                             ext_method_calls.add(f"self.{receiver.attr}.{method_name}")
         ci.external_class_accesses = dict(ext_accesses)
         ci.external_method_calls = ext_method_calls
@@ -1374,23 +1830,38 @@ class SmellDetector(ast.NodeVisitor):
         cls_name = node.name
         none_attrs = self._class_attrs.get(cls_name, [])
         if len(none_attrs) >= 2:
-            self._add(node.lineno, "#016", "Build With The Essence", "warning",
-                      f"`{cls_name}.__init__` sets {len(none_attrs)} attrs to None: "
-                      f"{', '.join(none_attrs[:5])} -- require them in constructor",
-                      "state")
+            self._add(
+                node.lineno,
+                "#016",
+                "Build With The Essence",
+                "warning",
+                f"`{cls_name}.__init__` sets {len(none_attrs)} attrs to None: "
+                f"{', '.join(none_attrs[:5])} -- require them in constructor",
+                "state",
+            )
 
         bool_attrs = self._class_bool_attrs.get(cls_name, [])
         if len(bool_attrs) >= 3:
-            self._add(node.lineno, "#017", "Convert Attributes to Sets", "info",
-                      f"`{cls_name}` has {len(bool_attrs)} boolean flags: "
-                      f"{', '.join(bool_attrs)} -- consider a roles/tags set",
-                      "state")
+            self._add(
+                node.lineno,
+                "#017",
+                "Convert Attributes to Sets",
+                "info",
+                f"`{cls_name}` has {len(bool_attrs)} boolean flags: "
+                f"{', '.join(bool_attrs)} -- consider a roles/tags set",
+                "state",
+            )
 
         method_count = self._class_methods.get(cls_name, 0)
         if method_count > MAX_CLASS_METHODS:
-            self._add(node.lineno, "#007", "Extract Class", "info",
-                      f"`{cls_name}` has {method_count} methods -- consider splitting",
-                      "types")
+            self._add(
+                node.lineno,
+                "#007",
+                "Extract Class",
+                "info",
+                f"`{cls_name}` has {method_count} methods -- consider splitting",
+                "types",
+            )
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         self._visit_func(node)
@@ -1517,26 +1988,36 @@ class SmellDetector(ast.NodeVisitor):
                     safe_open_lines.add(ctx.lineno)
         # Also clear open() calls wrapped in ExitStack.enter_context(open(...))
         for child in ast.walk(node):
-            if (isinstance(child, ast.Call)
-                    and isinstance(child.func, ast.Attribute)
-                    and child.func.attr == "enter_context"):
+            if (
+                isinstance(child, ast.Call)
+                and isinstance(child.func, ast.Attribute)
+                and child.func.attr == "enter_context"
+            ):
                 for arg in child.args:
-                    if (isinstance(arg, ast.Call)
-                            and isinstance(arg.func, ast.Name)
-                            and arg.func.id == "open"):
+                    if (
+                        isinstance(arg, ast.Call)
+                        and isinstance(arg.func, ast.Name)
+                        and arg.func.id == "open"
+                    ):
                         safe_open_lines.add(arg.lineno)
         self.generic_visit(node)
         self._open_calls_outside_with = [
-            (line, name) for line, name in self._open_calls_outside_with
+            (line, name)
+            for line, name in self._open_calls_outside_with
             if line not in safe_open_lines
         ]
 
     def finalize(self):
         """Post-traversal checks."""
         for line, name in self._open_calls_outside_with:
-            self._add(line, "#058", "Use Context Managers", "warning",
-                      f"`{name}()` call without `with` statement -- use context manager",
-                      "idioms")
+            self._add(
+                line,
+                "#058",
+                "Use Context Managers",
+                "warning",
+                f"`{name}()` call without `with` statement -- use context manager",
+                "idioms",
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -1568,13 +2049,24 @@ def scan_file(filepath: Path) -> tuple[list[Finding], FileData | None]:
 
 
 def _make_finding(
-    file: str, line: int, pattern: str, name: str, severity: str, message: str, category: str,
+    file: str,
+    line: int,
+    pattern: str,
+    name: str,
+    severity: str,
+    message: str,
+    category: str,
 ) -> Finding:
     """Create a Finding enriched from the rule registry (cross-file / metric use)."""
     rd = _RULE_REGISTRY.get(pattern)
     return Finding(
-        file=file, line=line, pattern=pattern,
-        name=name, severity=severity, message=message, category=category,
+        file=file,
+        line=line,
+        pattern=pattern,
+        name=name,
+        severity=severity,
+        message=message,
+        category=category,
         rule_id=rd.rule_id if rd else "",
         scope=rd.scope if rd else "cross_file",
     )
@@ -1583,6 +2075,7 @@ def _make_finding(
 # ---------------------------------------------------------------------------
 # Cross-file analysis (second pass) -- Original patterns
 # ---------------------------------------------------------------------------
+
 
 def _detect_duplicate_functions(all_data: list[FileData]) -> list[Finding]:
     """#013 -- Structurally identical functions via AST-normalized hashing."""
@@ -1599,12 +2092,17 @@ def _detect_duplicate_functions(all_data: list[FileData]) -> list[Finding]:
             continue
         first_file, first_name, first_line, _ = group[0]
         others = [f"{Path(fp).name}:{fn}" for fp, fn, _, _ in group[1:]]
-        findings.append(_make_finding(
-            file=first_file, line=first_line, pattern="#013",
-            name="Remove Duplicated Code", severity="warning",
-            message=f"`{first_name}` has structurally identical copies: {', '.join(others)}",
-            category="hygiene",
-        ))
+        findings.append(
+            _make_finding(
+                file=first_file,
+                line=first_line,
+                pattern="#013",
+                name="Remove Duplicated Code",
+                severity="warning",
+                message=f"`{first_name}` has structurally identical copies: {', '.join(others)}",
+                category="hygiene",
+            )
+        )
     return findings
 
 
@@ -1649,12 +2147,17 @@ def _detect_cyclic_imports(all_data: list[FileData]) -> list[Finding]:
         if key in reported:
             continue
         reported.add(key)
-        findings.append(_make_finding(
-            file=reverse_map.get(a, a), line=1, pattern="#CYC",
-            name="Break Cyclic Import", severity="warning",
-            message=f"Circular import: `{a}` <-> `{b}` -- extract shared types to break cycle",
-            category="architecture",
-        ))
+        findings.append(
+            _make_finding(
+                file=reverse_map.get(a, a),
+                line=1,
+                pattern="#CYC",
+                name="Break Cyclic Import",
+                severity="warning",
+                message=f"Circular import: `{a}` <-> `{b}` -- extract shared types to break cycle",
+                category="architecture",
+            )
+        )
     return findings
 
 
@@ -1662,10 +2165,13 @@ def _detect_god_modules(all_data: list[FileData]) -> list[Finding]:
     """#GOD -- Modules with too many top-level definitions."""
     return [
         _make_finding(
-            file=fd.filepath, line=1, pattern="#GOD",
-            name="Split God Module", severity="warning",
+            file=fd.filepath,
+            line=1,
+            pattern="#GOD",
+            name="Split God Module",
+            severity="warning",
             message=f"Module has {fd.toplevel_defs} top-level definitions "
-                    f"(threshold: {MAX_MODULE_TOPLEVEL_DEFS}) -- split into focused modules",
+            f"(threshold: {MAX_MODULE_TOPLEVEL_DEFS}) -- split into focused modules",
             category="architecture",
         )
         for fd in all_data
@@ -1681,23 +2187,34 @@ def _detect_feature_envy(all_data: list[FileData]) -> list[Finding]:
 
     findings: list[Finding] = []
     for fd in all_data:
-        for method_name, line, host_class, external_counts in fd.method_external_accesses:
+        for (
+            method_name,
+            line,
+            host_class,
+            external_counts,
+        ) in fd.method_external_accesses:
             for ext_class, count in external_counts.items():
                 if ext_class not in project_classes:
                     continue
-                findings.append(_make_finding(
-                    file=fd.filepath, line=line, pattern="#FE",
-                    name="Move Method (Feature Envy)", severity="info",
-                    message=f"`{host_class}.{method_name}` accesses `{ext_class}` "
-                            f"{count} times -- consider moving to `{ext_class}`",
-                    category="architecture",
-                ))
+                findings.append(
+                    _make_finding(
+                        file=fd.filepath,
+                        line=line,
+                        pattern="#FE",
+                        name="Move Method (Feature Envy)",
+                        severity="info",
+                        message=f"`{host_class}.{method_name}` accesses `{ext_class}` "
+                        f"{count} times -- consider moving to `{ext_class}`",
+                        category="architecture",
+                    )
+                )
     return findings
 
 
 # ---------------------------------------------------------------------------
 # Cross-file analysis (second pass) -- Tier 2: new patterns
 # ---------------------------------------------------------------------------
+
 
 def _detect_shotgun_surgery(all_data: list[FileData]) -> list[Finding]:
     """#SHO -- Function called from too many different files."""
@@ -1715,19 +2232,37 @@ def _detect_shotgun_surgery(all_data: list[FileData]) -> list[Finding]:
         if func_name not in defined_in:
             continue
         # Exclude common names
-        if func_name in {"__init__", "__str__", "__repr__", "main", "setup", "run",
-                         "get", "set", "update", "delete", "create", "log", "print"}:
+        if func_name in {
+            "__init__",
+            "__str__",
+            "__repr__",
+            "main",
+            "setup",
+            "run",
+            "get",
+            "set",
+            "update",
+            "delete",
+            "create",
+            "log",
+            "print",
+        }:
             continue
         external_callers = callers - set(defined_in[func_name])
         if len(external_callers) > SHOTGUN_SURGERY_THRESHOLD:
             def_file = defined_in[func_name][0]
-            findings.append(_make_finding(
-                file=def_file, line=1, pattern="#SHO",
-                name="Shotgun Surgery", severity="info",
-                message=f"`{func_name}` is called from {len(external_callers)} different files "
-                        f"(threshold: {SHOTGUN_SURGERY_THRESHOLD}) -- changes will cascade widely",
-                category="architecture",
-            ))
+            findings.append(
+                _make_finding(
+                    file=def_file,
+                    line=1,
+                    pattern="#SHO",
+                    name="Shotgun Surgery",
+                    severity="info",
+                    message=f"`{func_name}` is called from {len(external_callers)} different files "
+                    f"(threshold: {SHOTGUN_SURGERY_THRESHOLD}) -- changes will cascade widely",
+                    category="architecture",
+                )
+            )
     return findings
 
 
@@ -1749,20 +2284,27 @@ def _detect_deep_inheritance(all_data: list[FileData]) -> list[Finding]:
         bases = all_bases[cls_name]
         if not bases:
             return 0
-        return 1 + max((_depth(b, visited.copy()) for b in bases if b in all_bases), default=0)
+        return 1 + max(
+            (_depth(b, visited.copy()) for b in bases if b in all_bases), default=0
+        )
 
     findings: list[Finding] = []
     for cls_name in all_bases:
         d = _depth(cls_name)
         if d > MAX_INHERITANCE_DEPTH:
             filepath, line = all_locations[cls_name]
-            findings.append(_make_finding(
-                file=filepath, line=line, pattern="#DIT",
-                name="Deep Inheritance Tree", severity="warning",
-                message=f"Class `{cls_name}` has inheritance depth {d} "
-                        f"(threshold: {MAX_INHERITANCE_DEPTH}) -- favor composition",
-                category="types",
-            ))
+            findings.append(
+                _make_finding(
+                    file=filepath,
+                    line=line,
+                    pattern="#DIT",
+                    name="Deep Inheritance Tree",
+                    severity="warning",
+                    message=f"Class `{cls_name}` has inheritance depth {d} "
+                    f"(threshold: {MAX_INHERITANCE_DEPTH}) -- favor composition",
+                    category="types",
+                )
+            )
     return findings
 
 
@@ -1782,13 +2324,18 @@ def _detect_wide_hierarchy(all_data: list[FileData]) -> list[Finding]:
         if len(subs) > MAX_DIRECT_SUBCLASSES and parent in all_locations:
             filepath, line = all_locations[parent]
             sub_names = subs[:5]
-            findings.append(_make_finding(
-                file=filepath, line=line, pattern="#WHI",
-                name="Wide Hierarchy", severity="info",
-                message=f"Class `{parent}` has {len(subs)} direct subclasses: "
-                        f"{', '.join(sub_names)}{'...' if len(subs) > 5 else ''} -- over-broad abstraction?",
-                category="types",
-            ))
+            findings.append(
+                _make_finding(
+                    file=filepath,
+                    line=line,
+                    pattern="#WHI",
+                    name="Wide Hierarchy",
+                    severity="info",
+                    message=f"Class `{parent}` has {len(subs)} direct subclasses: "
+                    f"{', '.join(sub_names)}{'...' if len(subs) > 5 else ''} -- over-broad abstraction?",
+                    category="types",
+                )
+            )
     return findings
 
 
@@ -1810,12 +2357,17 @@ def _detect_inappropriate_intimacy(all_data: list[FileData]) -> list[Finding]:
             a, b = sorted(pair)
             if a in class_files:
                 filepath, line = class_files[a]
-                findings.append(_make_finding(
-                    file=filepath, line=line, pattern="#INT",
-                    name="Inappropriate Intimacy", severity="info",
-                    message=f"Classes `{a}` and `{b}` share {count} attribute accesses -- decouple or merge",
-                    category="architecture",
-                ))
+                findings.append(
+                    _make_finding(
+                        file=filepath,
+                        line=line,
+                        pattern="#INT",
+                        name="Inappropriate Intimacy",
+                        severity="info",
+                        message=f"Classes `{a}` and `{b}` share {count} attribute accesses -- decouple or merge",
+                        category="architecture",
+                    )
+                )
     return findings
 
 
@@ -1840,12 +2392,17 @@ def _detect_speculative_generality(all_data: list[FileData]) -> list[Finding]:
         if concrete_children[abc_cls] == 0:
             for fd in all_data:
                 if abc_cls in fd.class_names:
-                    findings.append(_make_finding(
-                        file=fd.filepath, line=fd.class_lines.get(abc_cls, 1), pattern="#SPG",
-                        name="Remove Speculative Generality", severity="info",
-                        message=f"Abstract class `{abc_cls}` has no concrete implementations -- YAGNI?",
-                        category="architecture",
-                    ))
+                    findings.append(
+                        _make_finding(
+                            file=fd.filepath,
+                            line=fd.class_lines.get(abc_cls, 1),
+                            pattern="#SPG",
+                            name="Remove Speculative Generality",
+                            severity="info",
+                            message=f"Abstract class `{abc_cls}` has no concrete implementations -- YAGNI?",
+                            category="architecture",
+                        )
+                    )
                     break
     return findings
 
@@ -1878,18 +2435,24 @@ def _detect_unstable_dependency(all_data: list[FileData]) -> list[Finding]:
             dep_i = instability.get(dep, 0.0)
             if dep_i > my_i and dep_i > 0.7:
                 filepath = reverse_map[module]
-                findings.append(_make_finding(
-                    file=filepath, line=1, pattern="#UDE",
-                    name="Unstable Dependency", severity="info",
-                    message=f"Module `{module}` (I={my_i:.2f}) depends on unstable `{dep}` (I={dep_i:.2f})",
-                    category="architecture",
-                ))
+                findings.append(
+                    _make_finding(
+                        file=filepath,
+                        line=1,
+                        pattern="#UDE",
+                        name="Unstable Dependency",
+                        severity="info",
+                        message=f"Module `{module}` (I={my_i:.2f}) depends on unstable `{dep}` (I={dep_i:.2f})",
+                        category="architecture",
+                    )
+                )
     return findings
 
 
 # ---------------------------------------------------------------------------
 # Cross-file analysis (second pass) -- Tier 3: OO metrics
 # ---------------------------------------------------------------------------
+
 
 def _detect_low_cohesion(all_data: list[FileData]) -> list[Finding]:
     """#LCOM -- Lack of Cohesion of Methods."""
@@ -1906,20 +2469,27 @@ def _detect_low_cohesion(all_data: list[FileData]) -> list[Finding]:
             method_set = {m: f for m, f in methods_fields.items() if m != "__init__"}
             if not method_set:
                 continue
-            total_usage = sum(len(fields & all_fields) for fields in method_set.values())
+            total_usage = sum(
+                len(fields & all_fields) for fields in method_set.values()
+            )
             max_possible = len(method_set) * len(all_fields)
             if max_possible == 0:
                 continue
             cohesion = total_usage / max_possible
             lcom = 1.0 - cohesion
             if lcom > MAX_LCOM:
-                findings.append(_make_finding(
-                    file=ci.filepath, line=ci.line, pattern="#LCOM",
-                    name="Low Class Cohesion", severity="warning",
-                    message=f"Class `{ci.name}` has LCOM={lcom:.2f} "
-                            f"(threshold: {MAX_LCOM}) -- consider splitting",
-                    category="metrics",
-                ))
+                findings.append(
+                    _make_finding(
+                        file=ci.filepath,
+                        line=ci.line,
+                        pattern="#LCOM",
+                        name="Low Class Cohesion",
+                        severity="warning",
+                        message=f"Class `{ci.name}` has LCOM={lcom:.2f} "
+                        f"(threshold: {MAX_LCOM}) -- consider splitting",
+                        category="metrics",
+                    )
+                )
     return findings
 
 
@@ -1930,13 +2500,18 @@ def _detect_high_coupling(all_data: list[FileData]) -> list[Finding]:
         for ci in fd.class_info:
             coupled_classes = len(ci.external_class_accesses)
             if coupled_classes > MAX_CBO:
-                findings.append(_make_finding(
-                    file=ci.filepath, line=ci.line, pattern="#CBO",
-                    name="High Coupling Between Objects", severity="warning",
-                    message=f"Class `{ci.name}` is coupled to {coupled_classes} other classes "
-                            f"(threshold: {MAX_CBO})",
-                    category="metrics",
-                ))
+                findings.append(
+                    _make_finding(
+                        file=ci.filepath,
+                        line=ci.line,
+                        pattern="#CBO",
+                        name="High Coupling Between Objects",
+                        severity="warning",
+                        message=f"Class `{ci.name}` is coupled to {coupled_classes} other classes "
+                        f"(threshold: {MAX_CBO})",
+                        category="metrics",
+                    )
+                )
     return findings
 
 
@@ -1950,13 +2525,18 @@ def _detect_fan_out(all_data: list[FileData]) -> list[Finding]:
         src = module_map[fd.filepath]
         outgoing = {imp for imp in fd.imports if imp in reverse_map}
         if len(outgoing) > MAX_FANOUT:
-            findings.append(_make_finding(
-                file=fd.filepath, line=1, pattern="#FIO",
-                name="Excessive Fan-Out", severity="info",
-                message=f"Module `{src}` has {len(outgoing)} outgoing dependencies "
-                        f"(threshold: {MAX_FANOUT}) -- too many dependencies",
-                category="metrics",
-            ))
+            findings.append(
+                _make_finding(
+                    file=fd.filepath,
+                    line=1,
+                    pattern="#FIO",
+                    name="Excessive Fan-Out",
+                    severity="info",
+                    message=f"Module `{src}` has {len(outgoing)} outgoing dependencies "
+                    f"(threshold: {MAX_FANOUT}) -- too many dependencies",
+                    category="metrics",
+                )
+            )
     return findings
 
 
@@ -1969,14 +2549,19 @@ def _detect_high_rfc(all_data: list[FileData]) -> list[Finding]:
             external_calls = len(ci.external_method_calls)
             rfc = own_methods + external_calls
             if rfc > MAX_RFC:
-                findings.append(_make_finding(
-                    file=ci.filepath, line=ci.line, pattern="#RFC",
-                    name="High Response for Class", severity="info",
-                    message=f"Class `{ci.name}` has RFC={rfc} "
-                            f"({own_methods} methods + {external_calls} external calls) "
-                            f"(threshold: {MAX_RFC})",
-                    category="metrics",
-                ))
+                findings.append(
+                    _make_finding(
+                        file=ci.filepath,
+                        line=ci.line,
+                        pattern="#RFC",
+                        name="High Response for Class",
+                        severity="info",
+                        message=f"Class `{ci.name}` has RFC={rfc} "
+                        f"({own_methods} methods + {external_calls} external calls) "
+                        f"(threshold: {MAX_RFC})",
+                        category="metrics",
+                    )
+                )
     return findings
 
 
@@ -1989,19 +2574,25 @@ def _detect_middle_man(all_data: list[FileData]) -> list[Finding]:
                 continue
             ratio = ci.delegation_count / ci.non_dunder_method_count
             if ratio > MIDDLE_MAN_RATIO:
-                findings.append(_make_finding(
-                    file=ci.filepath, line=ci.line, pattern="#MID",
-                    name="Remove Middle Man", severity="info",
-                    message=f"Class `{ci.name}` delegates {ci.delegation_count}/{ci.non_dunder_method_count} "
-                            f"methods ({ratio:.0%}) -- consider removing the middleman",
-                    category="types",
-                ))
+                findings.append(
+                    _make_finding(
+                        file=ci.filepath,
+                        line=ci.line,
+                        pattern="#MID",
+                        name="Remove Middle Man",
+                        severity="info",
+                        message=f"Class `{ci.name}` delegates {ci.delegation_count}/{ci.non_dunder_method_count} "
+                        f"methods ({ratio:.0%}) -- consider removing the middleman",
+                        category="types",
+                    )
+                )
     return findings
 
 
 # ---------------------------------------------------------------------------
 # Cross-file analysis dispatcher
 # ---------------------------------------------------------------------------
+
 
 def cross_file_analysis(all_data: list[FileData]) -> list[Finding]:
     """Analyze patterns across files: all cross-file and metric checks."""
@@ -2041,7 +2632,19 @@ def scan_path(target: Path) -> list[Finding]:
     elif target.is_dir():
         for py_file in sorted(target.rglob("*.py")):
             parts = py_file.parts
-            if any(p in {".venv", "venv", "__pycache__", ".tox", ".eggs", "node_modules", ".git"} for p in parts):
+            if any(
+                p
+                in {
+                    ".venv",
+                    "venv",
+                    "__pycache__",
+                    ".tox",
+                    ".eggs",
+                    "node_modules",
+                    ".git",
+                }
+                for p in parts
+            ):
                 continue
             findings, fd = scan_file(py_file)
             all_findings.extend(findings)
@@ -2060,9 +2663,17 @@ def scan_path(target: Path) -> list[Finding]:
     return all_findings
 
 
-_SKIP_DIRS: Final = frozenset({
-    ".venv", "venv", "__pycache__", ".tox", ".eggs", "node_modules", ".git",
-})
+_SKIP_DIRS: Final = frozenset(
+    {
+        ".venv",
+        "venv",
+        "__pycache__",
+        ".tox",
+        ".eggs",
+        "node_modules",
+        ".git",
+    }
+)
 
 
 def _collect_py_files(target: Path) -> list[Path]:
@@ -2071,7 +2682,8 @@ def _collect_py_files(target: Path) -> list[Path]:
         return [target] if target.suffix == ".py" else []
     if target.is_dir():
         return [
-            p for p in sorted(target.rglob("*.py"))
+            p
+            for p in sorted(target.rglob("*.py"))
             if not any(part in _SKIP_DIRS for part in p.parts)
         ]
     return []
@@ -2122,7 +2734,9 @@ def scan_paths(
     for f in all_findings:
         if f.file not in source_cache:
             try:
-                source_cache[f.file] = Path(f.file).read_text(encoding="utf-8").splitlines()
+                source_cache[f.file] = (
+                    Path(f.file).read_text(encoding="utf-8").splitlines()
+                )
             except Exception:
                 source_cache[f.file] = []
         if not _is_suppressed(source_cache[f.file], f.line, f.pattern):
@@ -2139,18 +2753,23 @@ def scan_paths(
             select_set: set[str] = set()
             for s in select:
                 resolved = _resolve_code(s)
-                select_set.update(resolved if resolved else {f"#{s}" if not s.startswith("#") else s})
+                select_set.update(
+                    resolved if resolved else {f"#{s}" if not s.startswith("#") else s}
+                )
             all_findings = [f for f in all_findings if f.pattern in select_set]
 
         if ignore:
             ignore_set: set[str] = set()
             for s in ignore:
                 resolved = _resolve_code(s)
-                ignore_set.update(resolved if resolved else {f"#{s}" if not s.startswith("#") else s})
+                ignore_set.update(
+                    resolved if resolved else {f"#{s}" if not s.startswith("#") else s}
+                )
             all_findings = [f for f in all_findings if f.pattern not in ignore_set]
 
         if per_file_ignores:
             import fnmatch
+
             result = []
             for f in all_findings:
                 suppressed = False
@@ -2158,7 +2777,11 @@ def scan_paths(
                     code_set: set[str] = set()
                     for c in codes:
                         resolved = _resolve_code(c)
-                        code_set.update(resolved if resolved else {f"#{c}" if not c.startswith("#") else c})
+                        code_set.update(
+                            resolved
+                            if resolved
+                            else {f"#{c}" if not c.startswith("#") else c}
+                        )
                     if fnmatch.fnmatch(f.file, glob_pat) and f.pattern in code_set:
                         suppressed = True
                         break
@@ -2193,9 +2816,11 @@ def _print_summary(filtered: list[Finding]):
     print(f"\n{BOLD}{'=' * SEPARATOR_WIDTH}")
     print(f" Python Smell Detector -- {len(filtered)} findings")
     print(f"{'=' * SEPARATOR_WIDTH}{RESET}")
-    print(f"  {SEVERITY_COLORS['error']}errors: {counts.get('error', 0)}{RESET}  "
-          f"{SEVERITY_COLORS['warning']}warnings: {counts.get('warning', 0)}{RESET}  "
-          f"{SEVERITY_COLORS['info']}info: {counts.get('info', 0)}{RESET}")
+    print(
+        f"  {SEVERITY_COLORS['error']}errors: {counts.get('error', 0)}{RESET}  "
+        f"{SEVERITY_COLORS['warning']}warnings: {counts.get('warning', 0)}{RESET}  "
+        f"{SEVERITY_COLORS['info']}info: {counts.get('info', 0)}{RESET}"
+    )
     print()
 
     for filepath, file_findings in sorted(by_file.items()):
@@ -2280,6 +2905,8 @@ _HELP_TEXT: Final = textwrap.dedent("""\
       --select CODES      Only run these checks (comma-separated, e.g. SC701,057,CC)
       --ignore CODES      Skip these checks (comma-separated, e.g. SC601,006)
       --scope SCOPE       Only show findings of this scope: file | cross_file | metric
+      --generate-baseline Output a JSON baseline of current findings to stdout
+      --baseline PATH     Compare against baseline; only report new findings
       --version           Show version and exit
       -h, --help          Show this help
 
@@ -2295,6 +2922,11 @@ _HELP_TEXT: Final = textwrap.dedent("""\
     Configuration:
       smellcheck reads [tool.smellcheck] from the nearest pyproject.toml.
       CLI flags override config values.
+
+    Baseline workflow:
+      smellcheck src/ --generate-baseline > .smellcheck-baseline.json
+      smellcheck src/ --baseline .smellcheck-baseline.json --fail-on warning
+      Also configurable: baseline = ".smellcheck-baseline.json" in [tool.smellcheck]
 
     Examples:
       smellcheck src/
@@ -2329,6 +2961,7 @@ def _parse_args(
 
     if "--version" in args:
         from smellcheck import __version__
+
         print(f"smellcheck {__version__}")
         sys.exit(0)
 
@@ -2344,22 +2977,28 @@ def _parse_args(
         output_format = "json"
 
     if output_format not in {"text", "json", "github"}:
-        print(f"Error: invalid format '{output_format}' -- must be one of: text, json, github",
-              file=sys.stderr)
+        print(
+            f"Error: invalid format '{output_format}' -- must be one of: text, json, github",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # --fail-on
     fail_on = _pop_option(args, "--fail-on") or "error"
     if fail_on not in SEVERITY_ORDER:
-        print(f"Error: invalid --fail-on '{fail_on}' -- must be one of: info, warning, error",
-              file=sys.stderr)
+        print(
+            f"Error: invalid --fail-on '{fail_on}' -- must be one of: info, warning, error",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # --min-severity
     min_severity = _pop_option(args, "--min-severity") or "info"
     if min_severity not in SEVERITY_ORDER:
-        print(f"Error: invalid --min-severity '{min_severity}' -- must be one of: info, warning, error",
-              file=sys.stderr)
+        print(
+            f"Error: invalid --min-severity '{min_severity}' -- must be one of: info, warning, error",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # --select / --ignore
@@ -2371,8 +3010,10 @@ def _parse_args(
     # --scope
     scope_filter = _pop_option(args, "--scope")
     if scope_filter is not None and scope_filter not in _VALID_SCOPES:
-        print(f"Error: invalid --scope '{scope_filter}' -- must be one of: file, cross_file, metric",
-              file=sys.stderr)
+        print(
+            f"Error: invalid --scope '{scope_filter}' -- must be one of: file, cross_file, metric",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Remaining args are paths
@@ -2392,8 +3033,25 @@ def _parse_args(
 
 
 def main():
-    paths, output_format, min_severity, fail_on, select, ignore, scope_filter = _parse_args(
-        sys.argv[1:],
+    raw_args = list(sys.argv[1:])
+
+    # Extract baseline flags before _parse_args (avoids path validation)
+    generate_baseline = "--generate-baseline" in raw_args
+    if generate_baseline:
+        raw_args.remove("--generate-baseline")
+    baseline_path_str = _pop_option(raw_args, "--baseline")
+
+    if generate_baseline and baseline_path_str:
+        print(
+            "Error: --generate-baseline and --baseline are mutually exclusive",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    paths, output_format, min_severity, fail_on, select, ignore, scope_filter = (
+        _parse_args(
+            raw_args,
+        )
     )
 
     # Load config from nearest pyproject.toml
@@ -2405,11 +3063,29 @@ def main():
     if ignore is not None:
         config["ignore"] = ignore
 
+    # Config fallback for --baseline
+    if baseline_path_str is None and not generate_baseline:
+        baseline_path_str = config.get("baseline")
+
     findings = scan_paths(paths, config=config)
 
     # Apply --scope filter
     if scope_filter is not None:
         findings = [f for f in findings if f.scope == scope_filter]
+
+    # Generate baseline mode
+    if generate_baseline:
+        print(_generate_baseline_json(findings, Path.cwd()))
+        sys.exit(0)
+
+    # Compare against baseline
+    if baseline_path_str:
+        baseline_fps = _load_baseline(Path(baseline_path_str))
+        findings, suppressed = _filter_baseline(findings, baseline_fps, Path.cwd())
+        print(
+            f"{len(findings)} new findings (baseline: {suppressed} suppressed)",
+            file=sys.stderr,
+        )
 
     print_findings(findings, min_severity=min_severity, output_format=output_format)
 
