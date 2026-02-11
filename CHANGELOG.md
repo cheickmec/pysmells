@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1](https://github.com/cheickmec/smellcheck/compare/v0.2.0...v0.2.1) (2026-02-11)
+
+
+### Features
+
+* initial release -- 82-pattern Python refactoring skill with AST detector ([e96f750](https://github.com/cheickmec/smellcheck/commit/e96f7507e6739bb3463dca93e38ed04bc6cf1597))
+* restructure for PyPI, GitHub Action, pre-commit, and Agent Skills distribution ([e1bf50b](https://github.com/cheickmec/smellcheck/commit/e1bf50b2f4f1b8191903a84c7d262a0c312f163d))
+
+
+### Bug Fixes
+
+* address 9 code review findings (P1-P3) ([39a62c0](https://github.com/cheickmec/smellcheck/commit/39a62c0b2ce9fb0ce00f54e8dc4e4a97fddfc792))
+
+
+### Documentation
+
+* add community files for OSS maturity ([8b7fc5f](https://github.com/cheickmec/smellcheck/commit/8b7fc5fcc81f27c58469f220fd33483a116ab07c))
+* update README for cross-platform compatibility and SEO ([aecccba](https://github.com/cheickmec/smellcheck/commit/aecccba107b831b7206c543e1a1b34641a0c6903))
+
+
+### Miscellaneous
+
+* add CHANGELOG.md, fix version to 0.1.1 ([82aae13](https://github.com/cheickmec/smellcheck/commit/82aae130e0830ce38e4f0f1d46c26c095619ee33))
+* add pre-commit hook to prevent direct commits to main ([b23e812](https://github.com/cheickmec/smellcheck/commit/b23e812f123f551ad181d1262959e47ff503d1c0))
+* rename project from pysmells to smellcheck ([71589cc](https://github.com/cheickmec/smellcheck/commit/71589cc6efa36085d7c2bcc0e4d39c11edad1155))
+
 ## [0.1.1] - 2026-02-11
 
 ### Fixed
