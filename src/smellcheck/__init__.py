@@ -9,6 +9,6 @@ from smellcheck.detector import Finding, SmellDetector, print_findings, scan_pat
 try:
     __version__ = version("smellcheck")
 except PackageNotFoundError:
-    __version__ = "0.2.3"
+    __version__ = "0.2.4"
 
 __all__ = ["Finding", "SmellDetector", "scan_path", "print_findings", "__version__"]

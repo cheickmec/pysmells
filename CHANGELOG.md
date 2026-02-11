@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4](https://github.com/cheickmec/smellcheck/compare/v0.2.3...v0.2.4) (2026-02-11)
+
+
+### Bug Fixes
+
+* use absolute URL for logo so it renders on PyPI ([1156796](https://github.com/cheickmec/smellcheck/commit/1156796a40d0c00c5beacb408f4e47429e145612))
+
 ## [0.2.3](https://github.com/cheickmec/smellcheck/compare/v0.2.2...v0.2.3) (2026-02-11)
 
 
