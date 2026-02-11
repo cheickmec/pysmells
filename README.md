@@ -23,6 +23,8 @@
 
 **No dependencies.** Pure Python stdlib (`ast`, `pathlib`, `json`). Runs anywhere Python 3.10+ runs.
 
+> **What are code smells?** Code smells are surface-level patterns in source code that hint at deeper design problems — not bugs, but structural weaknesses that make code harder to maintain, extend, or understand. [Learn more →](https://github.com/cheickmec/smellcheck/blob/main/docs/code-smells-guide.md)
+
 ## Installation
 
 ### pip
@@ -113,7 +115,7 @@ smellcheck src/ --select 001,057,CC
 smellcheck src/ --ignore 003,006
 
 # Module execution
-python -m smellcheck src/
+python3 -m smellcheck src/
 
 # Generate a baseline of current findings
 smellcheck src/ --generate-baseline > .smellcheck-baseline.json
