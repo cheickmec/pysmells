@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3](https://github.com/cheickmec/smellcheck/compare/v0.2.2...v0.2.3) (2026-02-11)
+
+
+### Bug Fixes
+
+* replace placeholder emails with GitHub contact methods ([da5b152](https://github.com/cheickmec/smellcheck/commit/da5b152004b727a2ff44cdae7005827dd48c8184))
+
+
+### Documentation
+
+* add CI, downloads, pre-commit, and ruff badges ([b1ad9c0](https://github.com/cheickmec/smellcheck/commit/b1ad9c0ca260aa491d7e6a1e86d9919f79aad3ad))
+
 ## [0.2.2](https://github.com/cheickmec/smellcheck/compare/v0.2.1...v0.2.2) (2026-02-11)
 
 
