@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5](https://github.com/cheickmec/smellcheck/compare/v0.2.4...v0.2.5) (2026-02-11)
+
+
+### Features
+
+* baseline support, git hooks, and docs updates ([#17](https://github.com/cheickmec/smellcheck/issues/17)) ([b9683d8](https://github.com/cheickmec/smellcheck/commit/b9683d81f536679389111e30375e2a36e99abc5a))
+* implement unified SC code naming system ([#4](https://github.com/cheickmec/smellcheck/issues/4)) ([481bc52](https://github.com/cheickmec/smellcheck/commit/481bc52f1d687d4f1586a4cdcb1316566dce8813))
+
+
+### Bug Fixes
+
+* use GitHub App token in release-please to trigger CI on PRs ([#19](https://github.com/cheickmec/smellcheck/issues/19)) ([a7c82da](https://github.com/cheickmec/smellcheck/commit/a7c82da9b66a2c569f85ac3b173d9afdd3fb1670)), closes [#15](https://github.com/cheickmec/smellcheck/issues/15)
+
+
+### Miscellaneous
+
+* add doc-alignment pre-commit hook ([#18](https://github.com/cheickmec/smellcheck/issues/18)) ([89b9e78](https://github.com/cheickmec/smellcheck/commit/89b9e78599c390932adc4790c11d60943044d62e))
+* add pre-push hook to block direct pushes to main ([1996ebc](https://github.com/cheickmec/smellcheck/commit/1996ebc61da9134a621c71ac8a4f2e4bd1516339))
+
 ## [0.2.4](https://github.com/cheickmec/smellcheck/compare/v0.2.3...v0.2.4) (2026-02-11)
 
 
