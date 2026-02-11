@@ -41,18 +41,23 @@ git clone https://github.com/cheickmec/pysmells.git
 The detector is a single Python file with zero dependencies (stdlib only -- `ast`, `pathlib`, `json`, `collections`, `re`). No installation needed.
 
 ```bash
+# The script lives at:
+DETECT=plugins/python-refactoring/skills/python-refactoring/scripts/detect_smells.py
+
 # Scan a directory
-python detect_smells.py src/
+python $DETECT src/
 
 # Scan a single file
-python detect_smells.py myfile.py
+python $DETECT myfile.py
 
 # JSON output
-python detect_smells.py src/ --json
+python $DETECT src/ --json
 
 # Filter by severity
-python detect_smells.py src/ --min-severity warning
+python $DETECT src/ --min-severity warning
 ```
+
+Or copy `detect_smells.py` anywhere and run it directly -- it has no imports beyond stdlib.
 
 ### Manual setup for other tools
 
@@ -63,7 +68,7 @@ For tools without Agent Skills support (Aider, Windsurf, Continue.dev, Amazon Q)
 
 ## Detected Patterns
 
-### Per-File (38 checks)
+### Per-File (40 checks)
 
 | # | Pattern | Severity |
 |---|---------|----------|
@@ -72,6 +77,7 @@ For tools without Agent Skills support (Aider, Windsurf, Continue.dev, Amazon Q)
 | 003 | Magic numbers | info |
 | 004 | Bare except / unused exception variable | warning |
 | 006 | Generic names (data, result, tmp) | info |
+| 007 | Extract class (too many methods) | info |
 | 008 | UPPER_CASE without Final | info |
 | 009 | Unprotected public attributes | info |
 | 014 | isinstance chains | warning |
@@ -107,7 +113,7 @@ For tools without Agent Skills support (Aider, Windsurf, Continue.dev, Amazon Q)
 | 069 | Lazy class (<2 methods) | info |
 | 070 | Temporary fields | warning |
 
-### Cross-File (11 checks)
+### Cross-File (10 checks)
 
 | # | Pattern | Description |
 |---|---------|-------------|
@@ -122,7 +128,7 @@ For tools without Agent Skills support (Aider, Windsurf, Continue.dev, Amazon Q)
 | SPG | Speculative generality | Abstract class with no concrete subclasses |
 | UDE | Unstable dependency | Stable module depends on unstable module |
 
-### OO Metrics (6 checks)
+### OO Metrics (5 checks)
 
 | # | Metric | Threshold |
 |---|--------|-----------|
@@ -140,12 +146,12 @@ Each pattern includes a description, before/after code examples, and trade-offs:
 |------|----------|
 | `state.md` | Immutability, setters, attributes (001, 008, 009, 016, 017, 030) |
 | `functions.md` | Extraction, naming, parameters, CQS (002, 010, 020, 026, 027, 034, 037, 041, 050, 052, 064, 066) |
-| `types.md` | Classes, reification, polymorphism, nulls (007, 012, 014, 015, 019, 022, 023, 029, 038, 044, 048, 069, 070, DIT, WHI, MID) |
+| `types.md` | Classes, reification, polymorphism, nulls (007, 012, 014, 015, 019, 022, 023, 029, 038, 044, 048, 069, 070, DIT, WHI) |
 | `control.md` | Guards, pipelines, conditionals, phases (039-043, 046, 047, 049, 053, 055, 056, 067, 068) |
 | `architecture.md` | DI, singletons, exceptions, delegates (018, 024, 028, 035, 045, 051, 054, SHO, INT, SPG, UDE) |
 | `hygiene.md` | Constants, dead code, comments, style (003, 004, 011, 013, 021, 025, 031-033, 036, 065) |
 | `idioms.md` | Context managers, generators, unpacking (057-063) |
-| `metrics.md` | OO metrics: cohesion, coupling, fan-out, response (LCOM, CBO, FIO, RFC) |
+| `metrics.md` | OO metrics: cohesion, coupling, fan-out, response, delegation (LCOM, CBO, FIO, RFC, MID) |
 
 ## Compatibility
 
@@ -161,7 +167,7 @@ Each pattern includes a description, before/after code examples, and trade-offs:
 | Aider | `--read CONVENTIONS.md` | Manual |
 | Continue.dev | `.continue/rules/` | Manual |
 | Amazon Q | `.amazonq/rules/` | Manual |
-| Any tool | `python detect_smells.py src/` | Standalone |
+| Any tool | `python plugins/python-refactoring/skills/python-refactoring/scripts/detect_smells.py src/` | Standalone |
 
 ## How It Compares
 

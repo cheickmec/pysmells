@@ -3,7 +3,7 @@
 Python Code Smell Detector — maps findings to the 82-pattern refactoring catalog.
 
 Self-contained: stdlib only (ast, pathlib, sys, json, collections, re, textwrap).
-Detects 55 patterns programmatically (38 per-file + 17 cross-file/metric).
+Detects 55 patterns programmatically (40 per-file + 10 cross-file + 5 OO metrics).
 
 Usage:
     python detect_smells.py path/to/file_or_dir [--json] [--min-severity info]
@@ -61,6 +61,7 @@ class ClassInfo:
     all_fields: list[str] = field(default_factory=list)
     methods_using_fields: dict[str, set[str]] = field(default_factory=dict)  # method -> fields accessed
     external_class_accesses: dict[str, int] = field(default_factory=dict)  # other_class -> access count
+    external_method_calls: set[str] = field(default_factory=set)  # "ClassName.method" distinct calls
     delegation_count: int = 0  # methods that just delegate to another object
     non_dunder_method_count: int = 0
     is_abstract: bool = False
@@ -198,15 +199,27 @@ def _normalize_ast(node: ast.AST) -> str:
 
 
 def _extract_imports(tree: ast.Module) -> list[str]:
-    """Extract all imported module names from a module's AST."""
+    """Extract all imported module names from a module's AST.
+
+    Returns both the full dotted path and all intermediate segments so that
+    cross-file matching works for both package-style imports (``from pkg.sub import x``)
+    and flat single-file imports (``import utils``).
+    """
     imports: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                imports.append(alias.name.split(".")[0])
+                # "import pkg_a.a" → ["pkg_a", "a", "pkg_a.a"]
+                parts = alias.name.split(".")
+                imports.extend(parts)
+                if len(parts) > 1:
+                    imports.append(alias.name)
         elif isinstance(node, ast.ImportFrom):
             if node.module:
-                imports.append(node.module.split(".")[0])
+                parts = node.module.split(".")
+                imports.extend(parts)
+                if len(parts) > 1:
+                    imports.append(node.module)
     return imports
 
 
@@ -1112,17 +1125,27 @@ class SmellDetector(ast.NodeVisitor):
                                 and func.value.value.id == "self"):
                             ci.delegation_count += 1
 
-        # Collect external class accesses for intimacy/CBO
+        # Collect external class accesses for intimacy/CBO and external method calls for RFC
         ext_accesses: dict[str, int] = Counter()
+        ext_method_calls: set[str] = set()
         for stmt in node.body:
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 for child in ast.walk(stmt):
-                    if (isinstance(child, ast.Attribute)
-                            and isinstance(child.value, ast.Name)
-                            and child.value.id != "self"
-                            and child.value.id[0:1].isupper()):
-                        ext_accesses[child.value.id] += 1
+                    if isinstance(child, ast.Attribute) and isinstance(child.value, ast.Name):
+                        if child.value.id != "self" and child.value.id[0:1].isupper():
+                            ext_accesses[child.value.id] += 1
+                    # Track distinct external method calls: self.x.method() and ClassName.method()
+                    if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute):
+                        receiver = child.func.value
+                        method_name = child.func.attr
+                        if isinstance(receiver, ast.Name) and receiver.id != "self":
+                            ext_method_calls.add(f"{receiver.id}.{method_name}")
+                        elif (isinstance(receiver, ast.Attribute)
+                              and isinstance(receiver.value, ast.Name)
+                              and receiver.value.id == "self"):
+                            ext_method_calls.add(f"self.{receiver.attr}.{method_name}")
         ci.external_class_accesses = dict(ext_accesses)
+        ci.external_method_calls = ext_method_calls
         ci.is_abstract = is_abstract
 
         if is_abstract:
@@ -1218,9 +1241,25 @@ class SmellDetector(ast.NodeVisitor):
         self._func_stack.pop()
 
     def visit_If(self, node: ast.If):
-        self._check_isinstance_chain(node)
-        self._check_missing_else(node)
+        # Skip elif branches -- they are ast.If nodes nested in orelse of the parent If.
+        # Only check top-level If nodes to avoid duplicate findings (#014, #068).
+        if not self._is_elif(node):
+            self._check_isinstance_chain(node)
+            self._check_missing_else(node)
         self.generic_visit(node)
+
+    def _is_elif(self, node: ast.If) -> bool:
+        """Check if this If node is an elif (nested inside another If's orelse)."""
+        # Walk up through the parent chain by checking func/class bodies
+        # Since ast doesn't track parents, we check the enclosing scope's body
+        scope = self._func_stack[-1] if self._func_stack else None
+        if scope is None:
+            return False
+        for parent in ast.walk(scope):
+            if isinstance(parent, ast.If) and parent is not node:
+                if len(parent.orelse) == 1 and parent.orelse[0] is node:
+                    return True
+        return False
 
     def visit_For(self, node: ast.For):
         self._check_loop_append(node)
@@ -1271,18 +1310,28 @@ class SmellDetector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_With(self, node: ast.With):
-        with_open_lines = set()
+        safe_open_lines: set[int] = set()
         for item in node.items:
             ctx = item.context_expr
             if isinstance(ctx, ast.Call):
                 if isinstance(ctx.func, ast.Name) and ctx.func.id == "open":
-                    with_open_lines.add(ctx.lineno)
+                    safe_open_lines.add(ctx.lineno)
                 elif isinstance(ctx.func, ast.Attribute) and ctx.func.attr == "open":
-                    with_open_lines.add(ctx.lineno)
+                    safe_open_lines.add(ctx.lineno)
+        # Also clear open() calls wrapped in ExitStack.enter_context(open(...))
+        for child in ast.walk(node):
+            if (isinstance(child, ast.Call)
+                    and isinstance(child.func, ast.Attribute)
+                    and child.func.attr == "enter_context"):
+                for arg in child.args:
+                    if (isinstance(arg, ast.Call)
+                            and isinstance(arg.func, ast.Name)
+                            and arg.func.id == "open"):
+                        safe_open_lines.add(arg.lineno)
         self.generic_visit(node)
         self._open_calls_outside_with = [
             (line, name) for line, name in self._open_calls_outside_with
-            if line not in with_open_lines
+            if line not in safe_open_lines
         ]
 
     def finalize(self):
@@ -1701,21 +1750,15 @@ def _detect_high_rfc(all_data: list[FileData]) -> list[Finding]:
     findings: list[Finding] = []
     for fd in all_data:
         for ci in fd.class_info:
-            # RFC = own methods + external method calls
             own_methods = ci.method_count
-            external_calls: set[str] = set()
-            for method_fields in ci.methods_using_fields.values():
-                pass  # We need external calls, not fields
-            # Count unique external calls from all methods
-            for field_name, accesses in ci.external_class_accesses.items():
-                external_calls.add(field_name)
-            rfc = own_methods + len(external_calls)
+            external_calls = len(ci.external_method_calls)
+            rfc = own_methods + external_calls
             if rfc > MAX_RFC:
                 findings.append(Finding(
                     file=ci.filepath, line=ci.line, pattern="#RFC",
                     name="High Response for Class", severity="info",
                     message=f"Class `{ci.name}` has RFC={rfc} "
-                            f"({own_methods} methods + {len(external_calls)} external) "
+                            f"({own_methods} methods + {external_calls} external calls) "
                             f"(threshold: {MAX_RFC})",
                     category="metrics",
                 ))
@@ -1792,6 +1835,12 @@ def scan_path(target: Path) -> list[Finding]:
 
     if len(all_file_data) > 1:
         all_findings.extend(cross_file_analysis(all_file_data))
+    elif len(all_file_data) == 1:
+        # Single-file scan: still compute per-class metrics (LCOM, CBO, RFC, MID)
+        all_findings.extend(_detect_low_cohesion(all_file_data))
+        all_findings.extend(_detect_high_coupling(all_file_data))
+        all_findings.extend(_detect_high_rfc(all_file_data))
+        all_findings.extend(_detect_middle_man(all_file_data))
 
     return all_findings
 
@@ -1864,9 +1913,9 @@ _HELP_TEXT: Final = textwrap.dedent("""\
     Scan Python files for code smells mapped to the 82-pattern refactoring catalog.
 
     Detects 55 patterns programmatically:
-      - 38 per-file (AST analysis)
-      - 11 cross-file (import graph, duplicate detection, inheritance)
-      - 6 OO metrics (LCOM, CBO, fan-out, RFC, middle man)
+      - 40 per-file (AST analysis)
+      - 10 cross-file (import graph, duplicate detection, inheritance)
+      - 5 OO metrics (LCOM, CBO, fan-out, RFC, middle man)
 
     Options:
       --json              Output as JSON
@@ -1895,6 +1944,10 @@ def _parse_args(argv: list[str]) -> tuple[Path, bool, str]:
         idx = args.index("--min-severity")
         if idx + 1 < len(args):
             min_severity = args[idx + 1]
+            if min_severity not in SEVERITY_ORDER:
+                print(f"Error: invalid severity '{min_severity}' -- must be one of: info, warning, error",
+                      file=sys.stderr)
+                sys.exit(1)
             args = args[:idx] + args[idx + 2:]
         else:
             print("Error: --min-severity requires a value (info|warning|error)", file=sys.stderr)

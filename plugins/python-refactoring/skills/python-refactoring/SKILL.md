@@ -20,12 +20,14 @@ description: "Python refactoring catalog with 82 patterns covering immutability,
 | Setters / half-built objects | 001, 016 | state.md |
 | Mutable default args | 057 | idioms.md |
 | Unprotected public attributes | 009 | state.md |
-| Variables that never change | 003, 008 | hygiene.md |
+| Magic numbers / constants | 003 | hygiene.md |
+| Variables that never change | 008 | state.md |
 | Boolean flags for roles/states | 017 | state.md |
 | Stale cached/derived attributes | 030 | state.md |
 | Long function, multiple concerns | 002, 010 | functions.md |
-| Comments explaining what code does | 005, 011 | hygiene.md |
-| Generic names (result, data, tmp) | 006 | hygiene.md |
+| Comments replacing code | 005 | functions.md |
+| Comments explaining what code does | 011 | hygiene.md |
+| Generic names (result, data, tmp) | 006 | functions.md |
 | Duplicated logic | 013 | hygiene.md |
 | Near-duplicate functions | 050 | functions.md |
 | Long related parameter lists | 034, 052 | functions.md |
@@ -88,7 +90,7 @@ description: "Python refactoring catalog with 82 patterns covering immutability,
 | High coupling between objects (CBO) | CBO | metrics.md |
 | Excessive fan-out | FIO | metrics.md |
 | High response for class (RFC) | RFC | metrics.md |
-| Middle man (excessive delegation) | MID | types.md |
+| Middle man (excessive delegation) | MID | metrics.md |
 
 ## Reference Files
 
@@ -96,28 +98,28 @@ Load **only** the file(s) matching detected smells:
 
 - `references/state.md` -- Immutability, setters, attributes (001, 008, 009, 016, 017, 030)
 - `references/functions.md` -- Method extraction, naming, parameters, CQS (002, 005, 006, 010, 020, 026, 027, 034, 037, 041, 050, 052, 064, 066)
-- `references/types.md` -- Class design, reification, polymorphism, nulls (007, 012, 014, 015, 019, 022, 023, 029, 038, 044, 048, 069, 070, DIT, WHI, MID)
+- `references/types.md` -- Class design, reification, polymorphism, nulls (007, 012, 014, 015, 019, 022, 023, 029, 038, 044, 048, 069, 070, DIT, WHI)
 - `references/control.md` -- Guard clauses, pipelines, conditionals, phases (039-043, 046, 047, 049, 053, 055, 056, 067, 068)
 - `references/architecture.md` -- DI, singletons, exceptions, delegates (018, 024, 028, 035, 045, 051, 054, SHO, INT, SPG, UDE)
 - `references/hygiene.md` -- Constants, dead code, comments, style (003, 004, 011, 013, 021, 025, 031-033, 036, 065)
-- `references/idioms.md` -- Context managers, generators, unpacking, protocols (057-063, 060, 061)
-- `references/metrics.md` -- OO metrics: cohesion, coupling, fan-out, response (LCOM, CBO, FIO, RFC)
+- `references/idioms.md` -- Context managers, generators, unpacking, protocols (057-063)
+- `references/metrics.md` -- OO metrics: cohesion, coupling, fan-out, response, delegation (LCOM, CBO, FIO, RFC, MID)
 
 ## Automated Smell Detector
 
-`scripts/detect_smells.py` -- stdlib-only AST walker that programmatically detects ~55 patterns (38 per-file + 11 cross-file + 6 OO metrics).
+`scripts/detect_smells.py` -- stdlib-only AST walker that programmatically detects 55 patterns (40 per-file + 10 cross-file + 5 OO metrics).
 
 ```bash
-python detect_smells.py src/              # scan directory
-python detect_smells.py myfile.py --json   # JSON output
-python detect_smells.py src/ --min-severity warning  # filter noise
+python scripts/detect_smells.py src/              # scan directory
+python scripts/detect_smells.py myfile.py --json   # JSON output
+python scripts/detect_smells.py src/ --min-severity warning  # filter noise
 ```
 
-**Per-file detections** (38): #001 setters, #002 long functions, #003 magic numbers, #004 bare except, #006 generic names, #008 UPPER_CASE without Final, #009 public attrs, #014 isinstance chains, #016 half-built objects, #017 boolean flags, #018 singleton, #021 dead code after return, #024 global mutables, #026 input() in logic, #028 sequential IDs, #029 return None|list, #033 excessive decorators, #034 too many params, #036 string concatenation, #039 deep nesting, #040 loop+append, #041 CQS violation, #042 complex booleans, #051 error codes, #054 Law of Demeter, #055 control flags, #057 mutable defaults, #058 open without with, #061 dataclass candidate, #062 sequential indexing, #063 contextlib candidate, #CC cyclomatic complexity, #064 unused parameters, #065 empty catch block, #066 long lambda, #067 complex comprehension, #068 missing else, #069 lazy class, #070 temporary field.
+**Per-file detections** (40): #001 setters, #002 long functions, #003 magic numbers, #004 bare except, #006 generic names, #007 extract class, #008 UPPER_CASE without Final, #009 public attrs, #014 isinstance chains, #016 half-built objects, #017 boolean flags, #018 singleton, #021 dead code after return, #024 global mutables, #026 input() in logic, #028 sequential IDs, #029 return None|list, #033 excessive decorators, #034 too many params, #036 string concatenation, #039 deep nesting, #040 loop+append, #041 CQS violation, #042 complex booleans, #051 error codes, #054 Law of Demeter, #055 control flags, #057 mutable defaults, #058 open without with, #061 dataclass candidate, #062 sequential indexing, #063 contextlib candidate, #CC cyclomatic complexity, #064 unused parameters, #065 empty catch block, #066 long lambda, #067 complex comprehension, #068 missing else, #069 lazy class, #070 temporary field.
 
-**Cross-file detections** (11): #013 duplicate functions (AST-normalized hashing), #CYC cyclic imports (DFS), #GOD god modules, #FE feature envy, #SHO shotgun surgery, #DIT deep inheritance, #WHI wide hierarchy, #INT inappropriate intimacy, #SPG speculative generality, #UDE unstable dependency.
+**Cross-file detections** (10): #013 duplicate functions (AST-normalized hashing), #CYC cyclic imports (DFS), #GOD god modules, #FE feature envy, #SHO shotgun surgery, #DIT deep inheritance, #WHI wide hierarchy, #INT inappropriate intimacy, #SPG speculative generality, #UDE unstable dependency.
 
-**OO metrics** (6): #LCOM lack of cohesion, #CBO coupling between objects, #FIO fan-out, #RFC response for class, #MID middle man.
+**OO metrics** (5): #LCOM lack of cohesion, #CBO coupling between objects, #FIO fan-out, #RFC response for class, #MID middle man.
 
 Run the detector first for a quick scan, then use the reference files to understand and apply the suggested refactorings.
 
