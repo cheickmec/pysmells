@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2](https://github.com/cheickmec/smellcheck/compare/v0.2.1...v0.2.2) (2026-02-11)
+
+
+### Bug Fixes
+
+* use solid white background for logo ([a4580f3](https://github.com/cheickmec/smellcheck/commit/a4580f3df2c4b944ba7b8814035aa3f8c0b5a4b0))
+
+
+### Documentation
+
+* add project logo and README badges ([a54f67a](https://github.com/cheickmec/smellcheck/commit/a54f67a4e6523cbc18d063fd5bc71a6eb4e91f28))
+
 ## [0.2.1](https://github.com/cheickmec/smellcheck/compare/v0.2.0...v0.2.1) (2026-02-11)
 
 
