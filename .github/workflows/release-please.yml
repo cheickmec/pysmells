@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - id: release
         uses: googleapis/release-please-action@v4
@@ -29,14 +30,51 @@ jobs:
     environment:
       name: pypi
       url: https://pypi.org/p/smellcheck
+    env:
+      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      # Guard 1: tag must match pyproject.toml version
+      - name: Verify tag matches package version
+        run: |
+          TAG_VERSION="${TAG_NAME#v}"
+          PKG_VERSION=$(python3 -c "
+          import re, pathlib
+          text = pathlib.Path('pyproject.toml').read_text()
+          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.MULTILINE)
+          print(m.group(1))
+          ")
+          echo "Tag version:    $TAG_VERSION"
+          echo "Package version: $PKG_VERSION"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Version mismatch: tag=$TAG_VERSION != pyproject.toml=$PKG_VERSION"
+            exit 1
+          fi
+
       - name: Install build tools
         run: pip install build
       - name: Build package
         run: python -m build
+
+      # Guard 2: smoke-test the built wheel before publishing
+      - name: Smoke-test wheel
+        run: |
+          TAG_VERSION="${TAG_NAME#v}"
+          pip install dist/smellcheck-*.whl
+          INSTALLED=$(smellcheck --version | awk '{print $2}')
+          echo "Installed version: $INSTALLED"
+          echo "Expected version:  $TAG_VERSION"
+          if [ "$INSTALLED" != "$TAG_VERSION" ]; then
+            echo "::error::Installed version $INSTALLED does not match tag $TAG_VERSION"
+            exit 1
+          fi
+          echo "Smoke test: smellcheck --version OK"
+          smellcheck --help > /dev/null
+          echo "Smoke test: smellcheck --help OK"
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

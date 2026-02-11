@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: version-parity
+        name: version-parity
+        entry: python -m pytest tests/test_version_parity.py -q --no-header --tb=short
+        language: system
+        pass_filenames: false
+        files: '(pyproject\.toml|\.release-please-manifest\.json|marketplace\.json)$'
