@@ -3,7 +3,7 @@
 Python Code Smell Detector — maps findings to the 82-pattern refactoring catalog.
 
 Self-contained: stdlib only (ast, pathlib, sys, json, collections, re, textwrap).
-Detects 55 patterns programmatically (40 per-file + 10 cross-file + 5 OO metrics).
+Detects 56 patterns programmatically (41 per-file + 10 cross-file + 5 OO metrics).
 
 Usage:
     smellcheck path/to/file_or_dir [--format json] [--min-severity info]
@@ -117,6 +117,7 @@ _RULE_REGISTRY: dict[str, RuleDef] = {
     # --- Family 7: Idioms (SC7xx) ---
     "#057": RuleDef("SC701", "057", "Replace Mutable Default Arguments", "idioms", "file", "error"),
     "#058": RuleDef("SC702", "058", "Use Context Managers", "idioms", "file", "warning"),
+    "#071": RuleDef("SC703", "071", "Avoid Blocking Calls in Async Functions", "idioms", "file", "warning"),
     # --- Family 8: Metrics (SC8xx) ---
     "#LCOM": RuleDef("SC801", "LCOM", "Low Class Cohesion", "metrics", "metric", "warning"),
     "#CBO":  RuleDef("SC802", "CBO", "High Coupling Between Objects", "metrics", "metric", "warning"),
@@ -191,6 +192,7 @@ _RULE_DESCRIPTIONS: dict[str, str] = {
     # Idioms
     "057": "Mutable default argument (list/dict/set) is shared across all calls.",
     "058": "Manual open/close resource cleanup instead of a 'with' context manager.",
+    "071": "Blocking I/O or sleep calls inside async functions freeze the event loop, preventing concurrent request handling.",
     # Metrics
     "LCOM": "Class methods operate on disjoint attribute sets — low cohesion.",
     "CBO":  "Class depends on too many other classes — high coupling.",
@@ -485,6 +487,107 @@ def _is_suppressed(source_lines: list[str], line: int, pattern: str) -> bool:
     for raw_code in codes_str.split(","):
         suppressed_patterns.update(_resolve_code(raw_code))
     return pattern in suppressed_patterns
+
+
+# ---------------------------------------------------------------------------
+# Blocking calls in async functions (#071)
+# ---------------------------------------------------------------------------
+
+# Maps call key -> (display_name, async_alternative)
+_BLOCKING_CALLS: Final = {
+    # Time
+    "time.sleep": ("time.sleep()", "asyncio.sleep()"),
+    # File I/O
+    "open": ("open()", "aiofiles.open()"),
+    # HTTP — requests
+    "requests.get": ("requests.get()", "httpx.AsyncClient"),
+    "requests.post": ("requests.post()", "httpx.AsyncClient"),
+    "requests.put": ("requests.put()", "httpx.AsyncClient"),
+    "requests.delete": ("requests.delete()", "httpx.AsyncClient"),
+    "requests.patch": ("requests.patch()", "httpx.AsyncClient"),
+    "requests.head": ("requests.head()", "httpx.AsyncClient"),
+    "requests.options": ("requests.options()", "httpx.AsyncClient"),
+    "requests.request": ("requests.request()", "httpx.AsyncClient"),
+    # HTTP — urllib
+    "urllib.request.urlopen": ("urllib.request.urlopen()", "httpx.AsyncClient"),
+    # Subprocess
+    "subprocess.run": ("subprocess.run()", "asyncio.create_subprocess_exec()"),
+    "subprocess.call": ("subprocess.call()", "asyncio.create_subprocess_exec()"),
+    "subprocess.check_call": ("subprocess.check_call()", "asyncio.create_subprocess_exec()"),
+    "subprocess.check_output": ("subprocess.check_output()", "asyncio.create_subprocess_exec()"),
+    "subprocess.Popen": ("subprocess.Popen()", "asyncio.create_subprocess_exec()"),
+    "os.system": ("os.system()", "asyncio.create_subprocess_exec()"),
+    "os.popen": ("os.popen()", "asyncio.create_subprocess_exec()"),
+    # Socket
+    "socket.create_connection": ("socket.create_connection()", "asyncio.open_connection()"),
+    "socket.getaddrinfo": ("socket.getaddrinfo()", "loop.getaddrinfo()"),
+    "socket.getnameinfo": ("socket.getnameinfo()", "loop.getnameinfo()"),
+    # Input
+    "input": ("input()", "asyncio stream reader"),
+    # OS filesystem
+    "os.listdir": ("os.listdir()", "asyncio.to_thread()"),
+    "os.walk": ("os.walk()", "asyncio.to_thread()"),
+    "os.remove": ("os.remove()", "asyncio.to_thread()"),
+    "os.rename": ("os.rename()", "asyncio.to_thread()"),
+    "os.mkdir": ("os.mkdir()", "asyncio.to_thread()"),
+    "os.makedirs": ("os.makedirs()", "asyncio.to_thread()"),
+    "os.stat": ("os.stat()", "asyncio.to_thread()"),
+    "os.path.exists": ("os.path.exists()", "asyncio.to_thread()"),
+    "os.path.isfile": ("os.path.isfile()", "asyncio.to_thread()"),
+    "os.path.isdir": ("os.path.isdir()", "asyncio.to_thread()"),
+    "os.path.getsize": ("os.path.getsize()", "asyncio.to_thread()"),
+    # Serialization
+    "pickle.load": ("pickle.load()", "asyncio.to_thread()"),
+    "pickle.dump": ("pickle.dump()", "asyncio.to_thread()"),
+}
+
+
+def _walk_skip_nested_scopes(node: ast.AST):
+    """Yield all descendant nodes, skipping nested function/lambda scopes."""
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            continue
+        yield child
+        yield from _walk_skip_nested_scopes(child)
+
+
+def _ast_nodes_refer_same_func(a: ast.AST, b: ast.AST) -> bool:
+    """Return True when *a* and *b* refer to the same dotted name (e.g. ``time.sleep``)."""
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, ast.Name) and isinstance(b, ast.Name):
+        return a.id == b.id
+    if isinstance(a, ast.Attribute) and isinstance(b, ast.Attribute):
+        return a.attr == b.attr and _ast_nodes_refer_same_func(a.value, b.value)
+    return False
+
+
+def _get_blocking_call_key(node: ast.Call) -> str | None:
+    """Extract a lookup key for *node* against ``_BLOCKING_CALLS``.
+
+    Returns one of:
+      - builtin name (``"open"``, ``"input"``)
+      - ``"mod.func"`` (``"time.sleep"``, ``"os.system"``)
+      - ``"mod.sub.func"`` (``"os.path.exists"``, ``"urllib.request.urlopen"``)
+      - ``None`` when the call shape doesn't match any pattern.
+    """
+    func = node.func
+    # Builtin: open(...), input(...)
+    if isinstance(func, ast.Name):
+        return func.id if func.id in _BLOCKING_CALLS else None
+    # Attribute chains: mod.func or mod.sub.func
+    if isinstance(func, ast.Attribute):
+        # Two-level: mod.sub.func  (e.g. os.path.exists)
+        if isinstance(func.value, ast.Attribute) and isinstance(func.value.value, ast.Name):
+            key = f"{func.value.value.id}.{func.value.attr}.{func.attr}"
+            if key in _BLOCKING_CALLS:
+                return key
+        # Single-level: mod.func  (e.g. time.sleep)
+        if isinstance(func.value, ast.Name):
+            key = f"{func.value.id}.{func.attr}"
+            if key in _BLOCKING_CALLS:
+                return key
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1552,6 +1655,59 @@ class SmellDetector(ast.NodeVisitor):
         if isinstance(node.func, ast.Name) and node.func.id == "open":
             self._open_calls_outside_with.append((node.lineno, "open"))
 
+    def _check_blocking_in_async(self, node: ast.AsyncFunctionDef):
+        """#071 -- Avoid Blocking Calls in Async Functions."""
+        for child in _walk_skip_nested_scopes(node):
+            if not isinstance(child, ast.Call):
+                continue
+            # Skip calls wrapped in asyncio.to_thread() or loop.run_in_executor()
+            if self._is_offloaded_call(child, node):
+                continue
+            key = _get_blocking_call_key(child)
+            if key is not None:
+                display, alt = _BLOCKING_CALLS[key]
+                self._add(
+                    child.lineno,
+                    "#071",
+                    "Avoid Blocking Calls in Async Functions",
+                    "warning",
+                    f"`{display}` blocks the event loop in async function `{node.name}` -- use {alt}",
+                    "idioms",
+                )
+
+    @staticmethod
+    def _is_offloaded_call(call_node: ast.Call, async_func: ast.AsyncFunctionDef) -> bool:
+        """Return True if *call_node* is an argument to ``asyncio.to_thread()`` or ``.run_in_executor()``."""
+        # Walk the async function body looking for to_thread / run_in_executor
+        # calls that contain call_node as an argument.
+        for wrapper in _walk_skip_nested_scopes(async_func):
+            if not isinstance(wrapper, ast.Call):
+                continue
+            func = wrapper.func
+            # asyncio.to_thread(blocking_fn, ...)
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "to_thread"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "asyncio"
+            ):
+                # The blocking function is the first positional arg (as a Name, not a Call)
+                # But also check if the blocking Call itself is somewhere in the wrapper args
+                if call_node in wrapper.args or call_node in (kw.value for kw in wrapper.keywords):
+                    return True
+                # Common pattern: asyncio.to_thread(time.sleep, 1) — the first arg is a Name/Attr, not a Call
+                # The call_node won't match, but the wrapper itself replaces it, so skip
+                # any call whose func matches a wrapper's first arg
+                if wrapper.args and _ast_nodes_refer_same_func(wrapper.args[0], call_node.func):
+                    return True
+            # loop.run_in_executor(executor, blocking_fn, ...)
+            if isinstance(func, ast.Attribute) and func.attr == "run_in_executor":
+                if call_node in wrapper.args or call_node in (kw.value for kw in wrapper.keywords):
+                    return True
+                if len(wrapper.args) >= 2 and _ast_nodes_refer_same_func(wrapper.args[1], call_node.func):
+                    return True
+        return False
+
     def _check_cyclomatic_complexity(
         self, node: ast.FunctionDef | ast.AsyncFunctionDef
     ):
@@ -1968,6 +2124,8 @@ class SmellDetector(ast.NodeVisitor):
         self._check_index_access(node)
         self._check_cyclomatic_complexity(node)
         self._check_unused_params(node)
+        if isinstance(node, ast.AsyncFunctionDef):
+            self._check_blocking_in_async(node)
         # Data collection
         self._collect_func_data(node)
         self._collect_external_accesses(node)
