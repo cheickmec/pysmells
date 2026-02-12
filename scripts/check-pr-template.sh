@@ -80,7 +80,12 @@ if [ "$matched_index" -eq -1 ]; then
     for name in "${template_names[@]}"; do
         msg+="  - \`$name\` — use \`?template=$name.md\` when creating the PR\n"
     done
-    echo -e "::error::$msg"
+    # GitHub workflow commands don't support raw newlines — encode them.
+    formatted_msg=$(printf '%b' "$msg")
+    formatted_msg=${formatted_msg//'%'/'%25'}
+    formatted_msg=${formatted_msg//$'\r'/'%0D'}
+    formatted_msg=${formatted_msg//$'\n'/'%0A'}
+    echo "::error::$formatted_msg"
 
     # Post comment if configured
     if [ -n "${PR_NUMBER:-}" ] && [ -n "${GH_TOKEN:-}" ] && [ -n "${GITHUB_REPO:-}" ]; then
@@ -132,7 +137,12 @@ msg="PR is missing ${#missing_headers[@]} required heading(s) from the '$matched
 for header in "${missing_headers[@]}"; do
     msg+="  - $header\n"
 done
-echo -e "::error::$msg"
+# GitHub workflow commands don't support raw newlines — encode them.
+formatted_msg=$(printf '%b' "$msg")
+formatted_msg=${formatted_msg//'%'/'%25'}
+formatted_msg=${formatted_msg//$'\r'/'%0D'}
+formatted_msg=${formatted_msg//$'\n'/'%0A'}
+echo "::error::$formatted_msg"
 
 # Post comment if configured
 if [ -n "${PR_NUMBER:-}" ] && [ -n "${GH_TOKEN:-}" ] && [ -n "${GITHUB_REPO:-}" ]; then

@@ -2921,85 +2921,91 @@ def _print_github_annotations(filtered: list[Finding]):
         print(f"::{sev} file={f.file},line={f.line},title={title}::{f.message}")
 
 
+_SARIF_LEVEL = {"error": "error", "warning": "warning", "info": "note"}
+
+_SARIF_REF_BASE = (
+    "https://github.com/cheickmec/smellcheck/blob/main/"
+    "plugins/python-refactoring/skills/python-refactoring/references"
+)
+
+
+def _sarif_rule(rd: RuleDef) -> dict:
+    """Build a SARIF reportingDescriptor (rule) from a RuleDef."""
+    desc = _RULE_DESCRIPTIONS.get(rd.pattern_ref, rd.name)
+    help_uri = f"{_SARIF_REF_BASE}/{rd.family}.md"
+    help_md = (
+        f"## {rd.name} ({rd.rule_id})\n\n"
+        f"{desc}\n\n"
+        f"**Family:** {rd.family} | "
+        f"**Scope:** {rd.scope} | "
+        f"**Default severity:** {rd.default_severity}\n\n"
+        f"[View refactoring guide]({help_uri})"
+    )
+    return {
+        "id": rd.rule_id,
+        "name": rd.name,
+        "shortDescription": {"text": rd.name},
+        "fullDescription": {"text": desc},
+        "helpUri": help_uri,
+        "help": {"text": desc, "markdown": help_md},
+        "defaultConfiguration": {
+            "level": _SARIF_LEVEL.get(rd.default_severity, "note"),
+        },
+        "properties": {
+            "family": rd.family,
+            "scope": rd.scope,
+            "patternRef": rd.pattern_ref,
+        },
+    }
+
+
+def _sarif_result(f: Finding, rule_index: dict[str, int]) -> dict:
+    """Build a SARIF result from a Finding."""
+    rule_id = f.rule_id or f.pattern
+    try:
+        rel = Path(f.file).resolve().relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        rel = Path(f.file).name
+    fp_raw = f"{rule_id}\0{rel}\0{_normalize_message(f.message)}"
+    fp_hash = hashlib.sha256(fp_raw.encode()).hexdigest()
+    result: dict = {
+        "ruleId": rule_id,
+        "level": _SARIF_LEVEL.get(f.severity, "note"),
+        "message": {"text": f.message},
+        "locations": [
+            {
+                "physicalLocation": {
+                    "artifactLocation": {"uri": rel},
+                    "region": {"startLine": f.line},
+                }
+            }
+        ],
+        "partialFingerprints": {"primaryLocationLineHash": fp_hash},
+    }
+    if rule_id in rule_index:
+        result["ruleIndex"] = rule_index[rule_id]
+    return result
+
+
 def _format_sarif(filtered: list[Finding]) -> str:
     """Format findings as SARIF 2.1.0 JSON for GitHub Code Scanning upload."""
     from smellcheck import __version__
 
-    _SARIF_LEVEL = {"error": "error", "warning": "warning", "info": "note"}
-
     # Collect unique rules that appear in findings
     seen_rules: dict[str, RuleDef] = {}
     for f in filtered:
-        code = f.rule_id or f.pattern
-        if code not in seen_rules:
+        if f.pattern not in seen_rules:
             rd = _RULE_REGISTRY.get(f.pattern)
             if rd:
                 seen_rules[rd.rule_id] = rd
-
-    _REF_BASE = (
-        "https://github.com/cheickmec/smellcheck/blob/main/"
-        "plugins/python-refactoring/skills/python-refactoring/references"
-    )
 
     rules = []
     rule_index: dict[str, int] = {}
     for idx, (rule_id, rd) in enumerate(seen_rules.items()):
         rule_index[rule_id] = idx
-        desc = _RULE_DESCRIPTIONS.get(rd.pattern_ref, rd.name)
-        help_uri = f"{_REF_BASE}/{rd.family}.md"
-        help_md = (
-            f"## {rd.name} ({rd.rule_id})\n\n"
-            f"{desc}\n\n"
-            f"**Family:** {rd.family} | "
-            f"**Scope:** {rd.scope} | "
-            f"**Default severity:** {rd.default_severity}\n\n"
-            f"[View refactoring guide]({help_uri})"
-        )
-        rules.append(
-            {
-                "id": rd.rule_id,
-                "name": rd.name,
-                "shortDescription": {"text": rd.name},
-                "fullDescription": {"text": desc},
-                "helpUri": help_uri,
-                "help": {"text": desc, "markdown": help_md},
-                "defaultConfiguration": {
-                    "level": _SARIF_LEVEL.get(rd.default_severity, "note"),
-                },
-                "properties": {
-                    "family": rd.family,
-                    "scope": rd.scope,
-                    "patternRef": rd.pattern_ref,
-                },
-            }
-        )
+        rules.append(_sarif_rule(rd))
 
-    results = []
-    for f in filtered:
-        rule_id = f.rule_id or f.pattern
-        try:
-            rel = Path(f.file).resolve().relative_to(Path.cwd().resolve()).as_posix()
-        except ValueError:
-            rel = Path(f.file).name
-        fp_raw = f"{rule_id}\0{rel}\0{_normalize_message(f.message)}"
-        fp_hash = hashlib.sha256(fp_raw.encode()).hexdigest()
-        result: dict = {
-            "ruleId": rule_id,
-            "level": _SARIF_LEVEL.get(f.severity, "note"),
-            "message": {"text": f.message},
-            "locations": [
-                {
-                    "physicalLocation": {
-                        "artifactLocation": {"uri": rel, "uriBaseId": "%SRCROOT%"},
-                        "region": {"startLine": f.line},
-                    }
-                }
-            ],
-            "partialFingerprints": {"primaryLocationLineHash": fp_hash},
-        }
-        if rule_id in rule_index:
-            result["ruleIndex"] = rule_index[rule_id]
-        results.append(result)
+    results = [_sarif_result(f, rule_index) for f in filtered]
 
     sarif = {
         "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
