@@ -369,8 +369,8 @@ def test_cli_help():
 
 
 def test_rule_registry_complete():
-    """Registry has 55 entries with valid families and scopes."""
-    assert len(_RULE_REGISTRY) == 55
+    """Registry has 56 entries with valid families and scopes."""
+    assert len(_RULE_REGISTRY) == 56
     for pat, rd in _RULE_REGISTRY.items():
         assert pat.startswith("#"), f"Pattern {pat!r} must start with '#'"
         assert rd.rule_id.startswith("SC"), (
@@ -591,3 +591,169 @@ def test_baseline_config_support(tmp_path):
     data = json.loads(result.stdout)
     assert data == []
     assert "suppressed" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Blocking calls in async functions (#071 / SC703)
+# ---------------------------------------------------------------------------
+
+
+def test_blocking_sleep_in_async(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        import time
+        async def handler():
+            time.sleep(1)
+    """,
+    )
+    findings = scan_path(p)
+    patterns = [f.pattern for f in findings]
+    assert "#071" in patterns
+    msg = next(f.message for f in findings if f.pattern == "#071")
+    assert "time.sleep()" in msg
+
+
+def test_blocking_requests_in_async(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        import requests
+        async def fetch():
+            requests.get("http://example.com")
+    """,
+    )
+    findings = scan_path(p)
+    patterns = [f.pattern for f in findings]
+    assert "#071" in patterns
+
+
+def test_blocking_open_in_async(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        async def read_file():
+            f = open("data.txt")
+    """,
+    )
+    findings = scan_path(p)
+    patterns = [f.pattern for f in findings]
+    assert "#071" in patterns
+
+
+def test_blocking_subprocess_in_async(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        import subprocess
+        async def run_cmd():
+            subprocess.run(["ls"])
+    """,
+    )
+    findings = scan_path(p)
+    patterns = [f.pattern for f in findings]
+    assert "#071" in patterns
+
+
+def test_blocking_os_path_in_async(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        import os.path
+        async def check():
+            os.path.exists("/tmp/x")
+    """,
+    )
+    findings = scan_path(p)
+    patterns = [f.pattern for f in findings]
+    assert "#071" in patterns
+
+
+def test_blocking_input_in_async(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        async def prompt():
+            input("Enter: ")
+    """,
+    )
+    findings = scan_path(p)
+    patterns = [f.pattern for f in findings]
+    assert "#071" in patterns
+
+
+def test_no_flag_sync_function(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        import time
+        def handler():
+            time.sleep(1)
+    """,
+    )
+    findings = scan_path(p)
+    patterns = [f.pattern for f in findings]
+    assert "#071" not in patterns
+
+
+def test_no_flag_nested_def_in_async(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        import time
+        async def handler():
+            def inner():
+                time.sleep(1)
+            inner()
+    """,
+    )
+    findings = scan_path(p)
+    blocking = [f for f in findings if f.pattern == "#071"]
+    assert blocking == []
+
+
+def test_no_flag_asyncio_to_thread(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        import asyncio
+        import time
+        async def handler():
+            await asyncio.to_thread(time.sleep, 1)
+    """,
+    )
+    findings = scan_path(p)
+    blocking = [f for f in findings if f.pattern == "#071"]
+    assert blocking == []
+
+
+def test_no_flag_run_in_executor(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        import asyncio
+        import time
+        async def handler():
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(None, time.sleep, 1)
+    """,
+    )
+    findings = scan_path(p)
+    blocking = [f for f in findings if f.pattern == "#071"]
+    assert blocking == []
+
+
+def test_multiple_blocking_calls(tmp_path):
+    p = _write_py(
+        tmp_path,
+        """\
+        import time
+        import subprocess
+        async def handler():
+            time.sleep(1)
+            subprocess.run(["ls"])
+    """,
+    )
+    findings = scan_path(p)
+    blocking = [f for f in findings if f.pattern == "#071"]
+    assert len(blocking) >= 2

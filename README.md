@@ -212,7 +212,7 @@ Results include stable fingerprints for deduplication across runs.
 
 Every rule has a unified **SC code** (e.g. `SC701`) and a legacy **pattern ref** (e.g. `057`). Both forms work in `--select`, `--ignore`, and `# noqa` comments.
 
-### Per-File (40 checks)
+### Per-File (41 checks)
 
 | SC Code | # | Pattern | Severity |
 |---------|---|---------|----------|
@@ -256,6 +256,7 @@ Every rule has a unified **SC code** (e.g. `SC701`) and a legacy **pattern ref**
 | SC605 | 065 | Empty catch block | warning |
 | SC701 | 057 | Mutable default arguments | error |
 | SC702 | 058 | open() without context manager | warning |
+| SC703 | 071 | Blocking calls in async functions | warning |
 
 ### Cross-File (10 checks)
 
