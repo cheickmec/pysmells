@@ -752,3 +752,21 @@ def test_multiple_blocking_calls(tmp_path):
     findings = scan_path(p)
     blocking = [f for f in findings if f.pattern == "SC703"]
     assert len(blocking) >= 2
+
+
+def test_offloaded_and_standalone_blocking_call(tmp_path):
+    """Offloading one call should not suppress a separate standalone blocking call."""
+    p = _write_py(
+        tmp_path,
+        """\
+        import asyncio
+        import time
+        async def handler():
+            await asyncio.to_thread(time.sleep, 1)
+            time.sleep(5)  # standalone -- should still be flagged
+    """,
+    )
+    findings = scan_path(p)
+    blocking = [f for f in findings if f.pattern == "SC703"]
+    assert len(blocking) == 1
+    assert "time.sleep" in blocking[0].message

@@ -43,17 +43,17 @@ The detector is intentionally a single file. The code is tightly coupled (AST vi
 1. Add a `_check_<name>` method to the `SmellDetector` class
 2. Call it from the appropriate `visit_*` method (e.g., `visit_FunctionDef`, `visit_If`)
 3. Use `self._add(line, rule_id, name, severity, message, category)` to report findings
-4. Rule ID format: `SCxxx` where the series encodes the category (e.g., `SC703` for idioms, `SC201` for functions)
+4. Rule ID format: `SCxxx` where the series encodes the category (e.g., `SC2xx` for functions, `SC7xx` for idioms)
 5. Add a test in `tests/test_detector.py`
 
 Example:
 
 ```python
 def _check_too_many_returns(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-    """SC703 -- Function with too many return statements."""
+    """SC211 -- Function with too many return statements."""
     returns = [n for n in ast.walk(node) if isinstance(n, ast.Return)]
     if len(returns) > 5:
-        self._add(node.lineno, "SC703", "Too Many Returns", "info",
+        self._add(node.lineno, "SC211", "Too Many Returns", "info",
                   f"`{node.name}` has {len(returns)} return statements",
                   "functions")
 ```
@@ -80,7 +80,7 @@ Configurable thresholds live at the top of `detector.py` as `Final` constants. I
 We use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-feat: add SC703 too-many-returns check
+feat: add SC211 too-many-returns check
 fix: false positive in SC702 with ExitStack
 test: add regression test for elif duplicate findings
 docs: update README with new check

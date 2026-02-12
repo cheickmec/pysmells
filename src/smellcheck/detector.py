@@ -456,7 +456,7 @@ def _is_suppressed(source_lines: list[str], line: int, pattern: str) -> bool:
     codes_str = m.group(1)
     if codes_str is None:
         return True  # bare ``# noqa`` suppresses all
-    # Build set of legacy patterns that the noqa line intends to suppress
+    # Build set of patterns that the noqa line intends to suppress
     suppressed_patterns: set[str] = set()
     for raw_code in codes_str.split(","):
         suppressed_patterns.update(_resolve_code(raw_code))
@@ -525,25 +525,26 @@ def _walk_skip_nested_scopes(node: ast.AST):
         yield from _walk_skip_nested_scopes(child)
 
 
-def _ast_nodes_refer_same_func(a: ast.AST, b: ast.AST) -> bool:
-    """Return True when *a* and *b* refer to the same dotted name (e.g. ``time.sleep``)."""
-    if type(a) is not type(b):
-        return False
-    if isinstance(a, ast.Name) and isinstance(b, ast.Name):
-        return a.id == b.id
-    if isinstance(a, ast.Attribute) and isinstance(b, ast.Attribute):
-        return a.attr == b.attr and _ast_nodes_refer_same_func(a.value, b.value)
-    return False
+def _is_to_thread_call(node: ast.Call) -> bool:
+    """Return True if *node* is ``asyncio.to_thread(...)``."""
+    func = node.func
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr == "to_thread"
+        and isinstance(func.value, ast.Name)
+        and func.value.id == "asyncio"
+    )
+
+
+def _is_run_in_executor_call(node: ast.Call) -> bool:
+    """Return True if *node* is ``<expr>.run_in_executor(...)``."""
+    return isinstance(node.func, ast.Attribute) and node.func.attr == "run_in_executor"
 
 
 def _get_blocking_call_key(node: ast.Call) -> str | None:
     """Extract a lookup key for *node* against ``_BLOCKING_CALLS``.
 
-    Returns one of:
-      - builtin name (``"open"``, ``"input"``)
-      - ``"mod.func"`` (``"time.sleep"``, ``"os.system"``)
-      - ``"mod.sub.func"`` (``"os.path.exists"``, ``"urllib.request.urlopen"``)
-      - ``None`` when the call shape doesn't match any pattern.
+    Returns a dotted name (e.g. ``"time.sleep"``), a builtin name, or ``None``.
     """
     func = node.func
     # Builtin: open(...), input(...)
@@ -1073,7 +1074,7 @@ class SmellDetector(ast.NodeVisitor):
     # =======================================================================
 
     def _check_isinstance_chain(self, node: ast.If):
-        """#014/#060 -- Replace IF with Polymorphism."""
+        """SC302 -- Replace IF with Polymorphism."""
         isinstance_count = 0
         current: ast.AST | None = node
         while current is not None:
@@ -1527,7 +1528,7 @@ class SmellDetector(ast.NodeVisitor):
 
     def _check_empty_catch(self, node: ast.ExceptHandler):
         """SC605 -- Remove Empty Catch Block: except SomeError: pass."""
-        # Skip cases already handled by #004 (bare except, except Exception: pass)
+        # Skip cases already handled by SC602 (bare except, except Exception: pass)
         if node.type is None:
             return
         if isinstance(node.type, ast.Name) and node.type.id == "Exception":
@@ -1650,34 +1651,14 @@ class SmellDetector(ast.NodeVisitor):
 
     @staticmethod
     def _is_offloaded_call(call_node: ast.Call, async_func: ast.AsyncFunctionDef) -> bool:
-        """Return True if *call_node* is an argument to ``asyncio.to_thread()`` or ``.run_in_executor()``."""
-        # Walk the async function body looking for to_thread / run_in_executor
-        # calls that contain call_node as an argument.
+        """Return True if *call_node* is wrapped by ``to_thread()`` or ``run_in_executor()``."""
         for wrapper in _walk_skip_nested_scopes(async_func):
             if not isinstance(wrapper, ast.Call):
                 continue
-            func = wrapper.func
-            # asyncio.to_thread(blocking_fn, ...)
-            if (
-                isinstance(func, ast.Attribute)
-                and func.attr == "to_thread"
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "asyncio"
-            ):
-                # The blocking function is the first positional arg (as a Name, not a Call)
-                # But also check if the blocking Call itself is somewhere in the wrapper args
-                if call_node in wrapper.args or call_node in (kw.value for kw in wrapper.keywords):
+            if _is_to_thread_call(wrapper) or _is_run_in_executor_call(wrapper):
+                if call_node in wrapper.args:
                     return True
-                # Common pattern: asyncio.to_thread(time.sleep, 1) — the first arg is a Name/Attr, not a Call
-                # The call_node won't match, but the wrapper itself replaces it, so skip
-                # any call whose func matches a wrapper's first arg
-                if wrapper.args and _ast_nodes_refer_same_func(wrapper.args[0], call_node.func):
-                    return True
-            # loop.run_in_executor(executor, blocking_fn, ...)
-            if isinstance(func, ast.Attribute) and func.attr == "run_in_executor":
-                if call_node in wrapper.args or call_node in (kw.value for kw in wrapper.keywords):
-                    return True
-                if len(wrapper.args) >= 2 and _ast_nodes_refer_same_func(wrapper.args[1], call_node.func):
+                if call_node in (kw.value for kw in wrapper.keywords):
                     return True
         return False
 
