@@ -40,6 +40,8 @@ echo -e "${YELLOW}│    • CONTRIBUTING.md    (architecture, adding checks)   
 echo -e "${YELLOW}│    • SKILL.md + refs/   (pattern catalog & families)    │${RESET}" >&2
 echo -e "${YELLOW}│                                                         │${RESET}" >&2
 echo -e "${YELLOW}│  CHANGELOG.md is auto-generated — no action needed.    │${RESET}" >&2
+echo -e "${YELLOW}│                                                         │${RESET}" >&2
+echo -e "${YELLOW}│  If you have an open PR, update its description too.   │${RESET}" >&2
 echo -e "${YELLOW}╰──────────────────────────────────────────────────────────╯${RESET}" >&2
 
 exit 0
