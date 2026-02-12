@@ -131,6 +131,75 @@ _RULE_ID_TO_LEGACY: dict[str, str] = {
     rd.rule_id: pat for pat, rd in _RULE_REGISTRY.items()
 }
 
+# fmt: off
+# Descriptions for SARIF help metadata (pattern_ref -> smell description).
+_RULE_DESCRIPTIONS: dict[str, str] = {
+    # State & Immutability
+    "001": "Mutable state via setters leads to half-built objects and unpredictable mutations.",
+    "008": "Values that never change are declared as mutable variables instead of constants.",
+    "009": "Exposed public attributes let anyone mutate internal state arbitrarily.",
+    "016": "Objects created empty then populated piecemeal — callers see half-built state.",
+    "017": "Boolean flags for every possible state or role instead of polymorphism or enums.",
+    "024": "Hidden global mutable state makes functions impure and hard to test.",
+    "028": "Sequential auto-incrementing IDs leak information and enable scraping.",
+    # Functions
+    "002": "Function is too long — doing multiple things that should be separate methods.",
+    "006": "Generic variable names like 'result', 'data', 'tmp' obscure intent.",
+    "026": "input() calls baked into business logic prevent testing and reuse.",
+    "029": "Returning None or a list forces every caller to check the return type.",
+    "033": "More decorators stacked on a function than lines of actual logic.",
+    "034": "Long parameter list of loosely related values — consider a parameter object.",
+    "041": "Function both returns a value and changes state (CQS violation).",
+    "064": "Parameters declared in the signature but never referenced in the function body.",
+    "066": "Lambda expression too long to read as a one-liner — use a named function.",
+    "CC":  "Too many independent paths through a function, making it hard to test.",
+    "FE":  "A method uses more attributes from another class than from its own.",
+    # Types & Classes
+    "007": "Related behavior is scattered across the codebase with no cohesive class.",
+    "014": "Type-checking isinstance/if-elif chains — use polymorphism instead.",
+    "018": "Singleton pattern: global shared state disguised as a design pattern.",
+    "061": "Boilerplate __init__/__repr__/__eq__ that @dataclass would generate.",
+    "062": "Accessing tuple/list elements by numeric index is cryptic and fragile.",
+    "069": "Class has too few methods and fields to justify its existence.",
+    "070": "Instance attributes set in __init__ but used in very few methods.",
+    "DIT": "Inheritance chain deeper than 3 levels makes the hierarchy hard to follow.",
+    "WHI": "A class with too many direct subclasses — overly broad abstraction.",
+    # Control Flow
+    "021": "Dead code: unused functions, unreachable branches, or commented-out blocks.",
+    "039": "Deep nesting obscures the happy path — use guard clauses instead.",
+    "040": "Imperative for-loop with .append() — use a list comprehension or pipeline.",
+    "042": "Complex boolean expression that is hard to parse mentally.",
+    "055": "Boolean flag variable controlling loop flow instead of break/continue.",
+    "067": "Comprehension is too nested or too long to read easily.",
+    "068": "if/elif chain without a final else branch to handle unexpected cases.",
+    # Architecture
+    "051": "Error codes returned instead of raising exceptions — callers forget to check.",
+    "054": "Chained attribute access (Law of Demeter) couples you to the object graph.",
+    "CYC": "Circular import: two or more modules import each other.",
+    "GOD": "God module with too many top-level definitions trying to do everything.",
+    "SHO": "Shotgun surgery: changing this symbol requires edits across many modules.",
+    "INT": "Two classes share too many internals, indicating inappropriate intimacy.",
+    "SPG": "Abstract base class with no concrete implementations — speculative generality.",
+    "UDE": "A stable module depends on a more volatile one, inverting the dependency direction.",
+    # Hygiene
+    "003": "Magic numbers or strings with no named constant to explain their meaning.",
+    "004": "Bare except clause swallows all exceptions including KeyboardInterrupt.",
+    "036": "String concatenation with + for multiline strings instead of f-strings or join.",
+    "063": "Manual try/finally context manager that contextlib would simplify.",
+    "065": "Exception handler with only 'pass' — silently swallowing errors.",
+    "013": "Same logic copy-pasted in multiple places — extract a shared function.",
+    # Idioms
+    "057": "Mutable default argument (list/dict/set) is shared across all calls.",
+    "058": "Manual open/close resource cleanup instead of a 'with' context manager.",
+    # Metrics
+    "LCOM": "Class methods operate on disjoint attribute sets — low cohesion.",
+    "CBO":  "Class depends on too many other classes — high coupling.",
+    "FIO":  "Module or class calls too many distinct external classes — excessive fan-out.",
+    "RFC":  "Class response set is too large — too many callable methods.",
+    "MID":  "Class delegates almost everything to another object — middle man.",
+}
+# fmt: on
+
 
 @dataclass
 class Finding:
@@ -2867,15 +2936,33 @@ def _format_sarif(filtered: list[Finding]) -> str:
             if rd:
                 seen_rules[rd.rule_id] = rd
 
+    _REF_BASE = (
+        "https://github.com/cheickmec/smellcheck/blob/main/"
+        "plugins/python-refactoring/skills/python-refactoring/references"
+    )
+
     rules = []
     rule_index: dict[str, int] = {}
     for idx, (rule_id, rd) in enumerate(seen_rules.items()):
         rule_index[rule_id] = idx
+        desc = _RULE_DESCRIPTIONS.get(rd.pattern_ref, rd.name)
+        help_uri = f"{_REF_BASE}/{rd.family}.md"
+        help_md = (
+            f"## {rd.name} ({rd.rule_id})\n\n"
+            f"{desc}\n\n"
+            f"**Family:** {rd.family} | "
+            f"**Scope:** {rd.scope} | "
+            f"**Default severity:** {rd.default_severity}\n\n"
+            f"[View refactoring guide]({help_uri})"
+        )
         rules.append(
             {
                 "id": rd.rule_id,
                 "name": rd.name,
                 "shortDescription": {"text": rd.name},
+                "fullDescription": {"text": desc},
+                "helpUri": help_uri,
+                "help": {"text": desc, "markdown": help_md},
                 "defaultConfiguration": {
                     "level": _SARIF_LEVEL.get(rd.default_severity, "note"),
                 },

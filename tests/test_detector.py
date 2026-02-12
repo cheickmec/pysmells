@@ -209,6 +209,29 @@ def test_sarif_rules_populated(tmp_path, capsys):
     assert "SC701" in rule_ids
 
 
+def test_sarif_rules_have_help_metadata(tmp_path, capsys):
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    findings = scan_path(p)
+    print_findings(findings, output_format="sarif")
+    data = json.loads(capsys.readouterr().out)
+    rules = data["runs"][0]["tool"]["driver"]["rules"]
+    sc701 = [r for r in rules if r["id"] == "SC701"]
+    assert len(sc701) == 1
+    rule = sc701[0]
+    # fullDescription present and non-empty
+    assert "fullDescription" in rule
+    assert len(rule["fullDescription"]["text"]) > 0
+    # help present with text and markdown
+    assert "help" in rule
+    assert "text" in rule["help"]
+    assert "markdown" in rule["help"]
+    assert "## " in rule["help"]["markdown"]  # contains heading
+    assert "refactoring guide" in rule["help"]["markdown"]
+    # helpUri present and points to reference
+    assert "helpUri" in rule
+    assert "references/idioms.md" in rule["helpUri"]
+
+
 def test_sarif_severity_mapping(tmp_path, capsys):
     p = _write_py(tmp_path, "def foo(x=[]): pass\n")
     findings = scan_path(p)
