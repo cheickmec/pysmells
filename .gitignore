@@ -18,4 +18,3 @@ venv/
 .serena/
 uv.lock
 logo-candidates/
-scripts/gen_logo_candidates.py
