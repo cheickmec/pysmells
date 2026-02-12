@@ -25,6 +25,15 @@ repos:
         always_run: true
         stages: [pre-push]
 
+      - id: pr-description-reminder
+        name: Remind about PR description
+        entry: bash scripts/check-pr-description-reminder.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+        verbose: true
+
       - id: version-parity
         name: version-parity
         entry: python3 -m pytest tests/test_version_parity.py -q --no-header --tb=short
