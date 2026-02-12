@@ -45,7 +45,7 @@ repos:
         name: check vendored smellcheck is in sync
         language: system
         entry: scripts/check-vendor-sync.sh
-        files: (^src/smellcheck/detector\.py|scripts/smellcheck/detector\.py)$
+        files: (^src/smellcheck/detector\.py$|^plugins/python-refactoring/skills/python-refactoring/scripts/smellcheck/detector\.py$)
         stages: [pre-commit]
         pass_filenames: false
 

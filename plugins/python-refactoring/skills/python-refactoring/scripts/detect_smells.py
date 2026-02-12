@@ -18,13 +18,13 @@ def _bundled_main():
     if not bundled.is_file():
         return None
     # Prepend so bundled smellcheck shadows any installed version
-    if scripts_dir not in sys.path:
-        sys.path.insert(0, scripts_dir)
+    sys.path.insert(0, scripts_dir)
     try:
         from smellcheck.detector import main
         return main
     except ImportError:
-        sys.path.remove(scripts_dir)
+        if scripts_dir in sys.path:
+            sys.path.remove(scripts_dir)
         return None
 
 

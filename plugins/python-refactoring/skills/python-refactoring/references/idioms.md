@@ -193,7 +193,7 @@ async def handle_request(url):
         async with session.get(url) as response:
             data = await response.text()
     # For unavoidable sync calls, offload:
-    config = await asyncio.to_thread(open("config.json").read)
+    config = await asyncio.to_thread(Path("config.json").read_text)
     return data
 ```
 

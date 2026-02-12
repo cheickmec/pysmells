@@ -5,11 +5,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 SRC="$REPO_ROOT/src/smellcheck"
 DEST="$REPO_ROOT/plugins/python-refactoring/skills/python-refactoring/scripts/smellcheck"
 
-VERSION=$(python3 -c "
-import tomllib, pathlib
-data = tomllib.loads(pathlib.Path('$REPO_ROOT/pyproject.toml').read_text())
-print(data['project']['version'])
-")
+VERSION=$(sed -n 's/^version *= *"\([^"]*\)"/\1/p' "$REPO_ROOT/pyproject.toml")
 
 mkdir -p "$DEST"
 cp "$SRC/detector.py" "$DEST/detector.py"
