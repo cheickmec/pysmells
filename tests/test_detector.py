@@ -154,6 +154,110 @@ def test_github_output_format(tmp_path, capsys):
 
 
 # ---------------------------------------------------------------------------
+# SARIF output format
+# ---------------------------------------------------------------------------
+
+
+def test_sarif_valid_structure(tmp_path, capsys):
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    findings = scan_path(p)
+    print_findings(findings, output_format="sarif")
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert data["version"] == "2.1.0"
+    assert "$schema" in data
+    assert "sarif-schema-2.1.0" in data["$schema"]
+    assert len(data["runs"]) == 1
+
+
+def test_sarif_tool_driver(tmp_path, capsys):
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    findings = scan_path(p)
+    print_findings(findings, output_format="sarif")
+    data = json.loads(capsys.readouterr().out)
+    driver = data["runs"][0]["tool"]["driver"]
+    assert driver["name"] == "smellcheck"
+    assert "version" in driver
+    assert "informationUri" in driver
+    assert isinstance(driver["rules"], list)
+
+
+def test_sarif_results_have_required_fields(tmp_path, capsys):
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    findings = scan_path(p)
+    print_findings(findings, output_format="sarif")
+    data = json.loads(capsys.readouterr().out)
+    results = data["runs"][0]["results"]
+    assert len(results) > 0
+    r = results[0]
+    assert "ruleId" in r
+    assert "level" in r
+    assert "message" in r and "text" in r["message"]
+    loc = r["locations"][0]["physicalLocation"]
+    assert "artifactLocation" in loc
+    assert "region" in loc
+    assert loc["region"]["startLine"] > 0
+
+
+def test_sarif_rules_populated(tmp_path, capsys):
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    findings = scan_path(p)
+    print_findings(findings, output_format="sarif")
+    data = json.loads(capsys.readouterr().out)
+    rules = data["runs"][0]["tool"]["driver"]["rules"]
+    rule_ids = [r["id"] for r in rules]
+    assert "SC701" in rule_ids
+
+
+def test_sarif_severity_mapping(tmp_path, capsys):
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    findings = scan_path(p)
+    print_findings(findings, output_format="sarif")
+    data = json.loads(capsys.readouterr().out)
+    results = data["runs"][0]["results"]
+    sc701 = [r for r in results if r["ruleId"] == "SC701"]
+    assert len(sc701) > 0
+    # SC701 is error-level → SARIF "error"
+    assert sc701[0]["level"] == "error"
+
+
+def test_sarif_relative_paths(tmp_path, capsys):
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    findings = scan_path(p)
+    print_findings(findings, output_format="sarif")
+    data = json.loads(capsys.readouterr().out)
+    results = data["runs"][0]["results"]
+    uri = results[0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+    assert not uri.startswith("/")
+
+
+def test_sarif_partial_fingerprints(tmp_path, capsys):
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    findings = scan_path(p)
+    print_findings(findings, output_format="sarif")
+    data = json.loads(capsys.readouterr().out)
+    results = data["runs"][0]["results"]
+    assert "partialFingerprints" in results[0]
+    fp = results[0]["partialFingerprints"]["primaryLocationLineHash"]
+    assert isinstance(fp, str) and len(fp) > 0
+
+
+def test_sarif_empty_findings(capsys):
+    print_findings([], output_format="sarif")
+    data = json.loads(capsys.readouterr().out)
+    assert data["version"] == "2.1.0"
+    assert data["runs"][0]["results"] == []
+    assert data["runs"][0]["tool"]["driver"]["rules"] == []
+
+
+def test_cli_format_sarif(tmp_path):
+    p = _write_py(tmp_path, "def foo(x=[]): pass\n")
+    result = _run_cli(str(p), "--format", "sarif")
+    data = json.loads(result.stdout)
+    assert data["version"] == "2.1.0"
+
+
+# ---------------------------------------------------------------------------
 # Inline suppression (# noqa)
 # ---------------------------------------------------------------------------
 

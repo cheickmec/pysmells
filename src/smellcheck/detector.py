@@ -2852,6 +2852,88 @@ def _print_github_annotations(filtered: list[Finding]):
         print(f"::{sev} file={f.file},line={f.line},title={title}::{f.message}")
 
 
+def _format_sarif(filtered: list[Finding]) -> str:
+    """Format findings as SARIF 2.1.0 JSON for GitHub Code Scanning upload."""
+    from smellcheck import __version__
+
+    _SARIF_LEVEL = {"error": "error", "warning": "warning", "info": "note"}
+
+    # Collect unique rules that appear in findings
+    seen_rules: dict[str, RuleDef] = {}
+    for f in filtered:
+        code = f.rule_id or f.pattern
+        if code not in seen_rules:
+            rd = _RULE_REGISTRY.get(f.pattern)
+            if rd:
+                seen_rules[rd.rule_id] = rd
+
+    rules = []
+    rule_index: dict[str, int] = {}
+    for idx, (rule_id, rd) in enumerate(seen_rules.items()):
+        rule_index[rule_id] = idx
+        rules.append(
+            {
+                "id": rd.rule_id,
+                "name": rd.name,
+                "shortDescription": {"text": rd.name},
+                "defaultConfiguration": {
+                    "level": _SARIF_LEVEL.get(rd.default_severity, "note"),
+                },
+                "properties": {
+                    "family": rd.family,
+                    "scope": rd.scope,
+                    "patternRef": rd.pattern_ref,
+                },
+            }
+        )
+
+    results = []
+    for f in filtered:
+        rule_id = f.rule_id or f.pattern
+        try:
+            rel = Path(f.file).resolve().relative_to(Path.cwd().resolve()).as_posix()
+        except ValueError:
+            rel = Path(f.file).name
+        fp_raw = f"{rule_id}\0{rel}\0{_normalize_message(f.message)}"
+        fp_hash = hashlib.sha256(fp_raw.encode()).hexdigest()
+        result: dict = {
+            "ruleId": rule_id,
+            "level": _SARIF_LEVEL.get(f.severity, "note"),
+            "message": {"text": f.message},
+            "locations": [
+                {
+                    "physicalLocation": {
+                        "artifactLocation": {"uri": rel, "uriBaseId": "%SRCROOT%"},
+                        "region": {"startLine": f.line},
+                    }
+                }
+            ],
+            "partialFingerprints": {"primaryLocationLineHash": fp_hash},
+        }
+        if rule_id in rule_index:
+            result["ruleIndex"] = rule_index[rule_id]
+        results.append(result)
+
+    sarif = {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "smellcheck",
+                        "version": __version__,
+                        "informationUri": "https://github.com/cheickmec/smellcheck",
+                        "rules": rules,
+                    }
+                },
+                "results": results,
+            }
+        ],
+    }
+    return json.dumps(sarif, indent=2)
+
+
 def print_findings(
     findings: list[Finding],
     use_json: bool = False,
@@ -2864,8 +2946,8 @@ def print_findings(
     Parameters
     ----------
     output_format:
-        ``"text"`` (default), ``"json"``, or ``"github"``.  When *None*,
-        falls back to ``use_json`` for backward compatibility.
+        ``"text"`` (default), ``"json"``, ``"github"``, or ``"sarif"``.
+        When *None*, falls back to ``use_json`` for backward compatibility.
     """
     fmt = output_format or ("json" if use_json else "text")
     min_rank = SEVERITY_ORDER.get(min_severity, 0)
@@ -2875,6 +2957,8 @@ def print_findings(
         print(json.dumps([asdict(f) for f in filtered], indent=2))
     elif fmt == "github":
         _print_github_annotations(filtered)
+    elif fmt == "sarif":
+        print(_format_sarif(filtered))
     elif not filtered:
         print(f"{BOLD}No code smells found.{RESET}")
     else:
@@ -2896,7 +2980,7 @@ _HELP_TEXT: Final = textwrap.dedent("""\
       - 5 OO metrics (LCOM, CBO, …)   — SC8xx        (scope: metric)
 
     Options:
-      --format FMT        Output format: text | json | github (default: text)
+      --format FMT        Output format: text | json | github | sarif (default: text)
       --json              Deprecated alias for --format json
       --fail-on SEV       Exit 1 if any finding >= SEV: info | warning | error
                           (default: error)
@@ -2976,9 +3060,9 @@ def _parse_args(
         args.remove("--json")
         output_format = "json"
 
-    if output_format not in {"text", "json", "github"}:
+    if output_format not in {"text", "json", "github", "sarif"}:
         print(
-            f"Error: invalid format '{output_format}' -- must be one of: text, json, github",
+            f"Error: invalid format '{output_format}' -- must be one of: text, json, github, sarif",
             file=sys.stderr,
         )
         sys.exit(1)

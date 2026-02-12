@@ -101,6 +101,9 @@ smellcheck src/ --format json
 # GitHub Actions annotations
 smellcheck src/ --format github
 
+# SARIF output (for GitHub Code Scanning)
+smellcheck src/ --format sarif > results.sarif
+
 # Filter by severity
 smellcheck src/ --min-severity warning
 
@@ -174,10 +177,36 @@ Fingerprints are resilient to line-number changes — renaming or moving code ar
 - **55 automated smell checks** -- per-file AST analysis, cross-file dependency analysis, and OO metrics
 - **82 refactoring patterns** -- numbered catalog with before/after examples, trade-offs, and severity levels
 - **Zero dependencies** -- stdlib-only, runs on any Python 3.10+ installation
-- **Multiple output formats** -- text (terminal), JSON (machine-readable), GitHub annotations (CI)
+- **Multiple output formats** -- text (terminal), JSON (machine-readable), GitHub annotations (CI), SARIF 2.1.0 (Code Scanning)
 - **Configurable** -- pyproject.toml config, inline suppression, CLI overrides
 - **Baseline support** -- adopt incrementally by suppressing existing findings and only failing on new ones
 - **Four distribution channels** -- pip, GitHub Action, pre-commit, Agent Skills
+
+## SARIF / Code Scanning
+
+Upload smellcheck findings to GitHub Code Scanning so they appear as native alerts in the Security tab and as PR annotations:
+
+```yaml
+# Add to your CI workflow
+code-scanning:
+  runs-on: ubuntu-latest
+  permissions:
+    security-events: write
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - run: pip install smellcheck
+    - run: smellcheck src/ --format sarif --min-severity warning > results.sarif
+      continue-on-error: true
+    - uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: results.sarif
+      if: always()
+```
+
+Results include stable fingerprints for deduplication across runs.
 
 ## Detected Patterns
 

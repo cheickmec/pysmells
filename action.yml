@@ -18,7 +18,7 @@ inputs:
     required: false
     default: 'info'
   format:
-    description: 'Output format: text | json | github'
+    description: 'Output format: text | json | github | sarif'
     required: false
     default: 'github'
   baseline:

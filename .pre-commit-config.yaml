@@ -9,6 +9,14 @@ repos:
         always_run: true
         stages: [pre-commit]
 
+      - id: no-commit-to-merged-branch
+        name: no-commit-to-merged-branch
+        entry: bash scripts/check-merged-branch.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
       - id: no-push-to-main
         name: no-push-to-main
         entry: bash -c 'branch=$(git rev-parse --abbrev-ref HEAD); if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then echo "Direct push to $branch is not allowed. Use a feature branch and open a PR." >&2; exit 1; fi'
