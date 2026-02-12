@@ -5,7 +5,7 @@ description: "Python refactoring catalog with 83 patterns covering immutability,
 
 # Python Refactoring Skill
 
-82 refactoring patterns from Contieri's series, Fowler's catalog, OO metrics literature, and Python idioms.
+83 refactoring patterns from Contieri's series, Fowler's catalog, OO metrics literature, and Python idioms.
 
 ## Modes
 
@@ -108,17 +108,15 @@ Load **only** the file(s) matching detected smells:
 
 ## Automated Smell Detector
 
-`scripts/detect_smells.py` -- stdlib-only AST walker that programmatically detects 56 patterns (41 per-file + 10 cross-file + 5 OO metrics).
-
-If `smellcheck` is pip-installed, the `smellcheck` CLI is also available:
+`scripts/detect_smells.py` runs the smell detector with 56 automated checks (41 per-file + 10 cross-file + 5 OO metrics). It ships with a bundled copy of the smellcheck package — no pip install required.
 
 ```bash
-# Via Agent Skills shim (always works)
-python scripts/detect_smells.py src/
-python scripts/detect_smells.py myfile.py --format json
+# Works immediately after skill install — no pip required
+python3 scripts/detect_smells.py src/
+python3 scripts/detect_smells.py myfile.py --format json
 
-# Via pip-installed CLI (if available)
-smellcheck src/
+# Or use the pip-installed CLI directly
+pip install smellcheck
 smellcheck src/ --min-severity warning --fail-on warning
 ```
 

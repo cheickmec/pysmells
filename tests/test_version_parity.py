@@ -110,3 +110,42 @@ def test_at_least_four_sources_checked(version_sources):
         f"Expected >= 4 version sources, got {len(version_sources)}: "
         + ", ".join(label for label, _ in version_sources)
     )
+
+
+# ---------------------------------------------------------------------------
+# Vendored bundle sync tests
+# ---------------------------------------------------------------------------
+
+VENDORED_DIR = (
+    REPO_ROOT
+    / "plugins"
+    / "python-refactoring"
+    / "skills"
+    / "python-refactoring"
+    / "scripts"
+    / "smellcheck"
+)
+
+
+def test_vendored_detector_matches_source():
+    """Vendored detector.py must be identical to source."""
+    source = REPO_ROOT / "src" / "smellcheck" / "detector.py"
+    vendored = VENDORED_DIR / "detector.py"
+    assert vendored.exists(), (
+        "Vendored detector.py not found — run scripts/vendor-smellcheck.sh"
+    )
+    assert source.read_text() == vendored.read_text(), (
+        "Vendored detector.py out of sync — run scripts/vendor-smellcheck.sh"
+    )
+
+
+def test_vendored_init_version_matches():
+    """Vendored __init__.py version must match canonical version."""
+    vendored_init = VENDORED_DIR / "__init__.py"
+    assert vendored_init.exists(), (
+        "Vendored __init__.py not found — run scripts/vendor-smellcheck.sh"
+    )
+    content = vendored_init.read_text()
+    assert f'__version__ = "{CANONICAL_VERSION}"' in content, (
+        f"Vendored __init__.py version doesn't match {CANONICAL_VERSION}"
+    )

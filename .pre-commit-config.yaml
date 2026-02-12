@@ -41,6 +41,14 @@ repos:
         pass_filenames: false
         files: '(pyproject\.toml|\.release-please-manifest\.json|marketplace\.json)$'
 
+      - id: vendor-sync
+        name: check vendored smellcheck is in sync
+        language: system
+        entry: scripts/check-vendor-sync.sh
+        files: (^src/smellcheck/detector\.py|scripts/smellcheck/detector\.py)$
+        stages: [pre-commit]
+        pass_filenames: false
+
       - id: doc-alignment
         name: doc-alignment
         entry: python3 scripts/check-doc-alignment.py
