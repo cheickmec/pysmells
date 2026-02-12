@@ -48,3 +48,18 @@ repos:
         pass_filenames: false
         always_run: false
         verbose: true
+
+      - id: check-commit-msg
+        name: Validate conventional commit message
+        entry: bash scripts/check-commit-msg.sh
+        language: system
+        stages: [commit-msg]
+        always_run: true
+
+      - id: breaking-change-reminder
+        name: Remind about breaking changes
+        entry: bash scripts/check-breaking-change-reminder.sh
+        language: system
+        stages: [commit-msg]
+        always_run: true
+        verbose: true
