@@ -11,6 +11,8 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e .
 pip install pytest pre-commit
 pre-commit install
+pre-commit install --hook-type commit-msg
+pre-commit install --hook-type pre-push
 ```
 
 ## Running tests
@@ -87,6 +89,8 @@ docs: update README with new check
 ```
 
 Scopes are optional but helpful: `feat(detector):`, `fix(cli):`, `test(regression):`.
+
+A pre-commit hook enforces this format -- invalid messages will be rejected. For breaking changes, use `feat!:` or add a `BREAKING CHANGE:` footer. Breaking changes bump the minor version (pre-1.0).
 
 ## Pull requests
 
