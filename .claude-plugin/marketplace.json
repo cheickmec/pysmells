@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Python code smell detector with 82+ patterns mapped to a refactoring catalog. AST-based, zero dependencies, stdlib only.",
-    "version": "0.2.5"
+    "version": "0.2.6"
   },
   "plugins": [
     {
       "name": "python-refactoring",
       "source": "./plugins/python-refactoring",
       "description": "Python refactoring catalog with 82+ patterns covering immutability, class design, control flow, architecture, OO metrics, and Python idioms. Analyze code for smells and apply numbered refactoring patterns.",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "author": {
         "name": "Cheick Berthe"
       },

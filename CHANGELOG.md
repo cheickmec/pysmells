@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6](https://github.com/cheickmec/smellcheck/compare/v0.2.5...v0.2.6) (2026-02-12)
+
+
+### Features
+
+* add header validation and PR commenting to template check ([2f34e23](https://github.com/cheickmec/smellcheck/commit/2f34e23c3e66c4ae5aa7647ec496627714ddf9a2))
+* add multi-template PR validation with marker-based enforcement ([7fff186](https://github.com/cheickmec/smellcheck/commit/7fff1864f0361dc58879f971ff66817323a8136a))
+* add SARIF 2.1.0 output format and merged-branch pre-commit hook ([1104ca3](https://github.com/cheickmec/smellcheck/commit/1104ca3869ea735c154736533eb9a848f765eea4))
+* **sarif:** add fullDescription, help, and helpUri to SARIF rules ([c74b118](https://github.com/cheickmec/smellcheck/commit/c74b1180de520b5d8b718fa8e2ec6b5f5f4fc7c0))
+
+
+### Bug Fixes
+
+* address Copilot review feedback on PR [#23](https://github.com/cheickmec/smellcheck/issues/23) ([dfceeda](https://github.com/cheickmec/smellcheck/commit/dfceedac6d52b2cda955eb73383905a6a1a6b28b))
+* skip PR template check for release-please bot PRs ([#24](https://github.com/cheickmec/smellcheck/issues/24)) ([85d8ae5](https://github.com/cheickmec/smellcheck/commit/85d8ae525c267dc54377fb1f1f15b3d296b5d50a))
+
+
+### Documentation
+
+* add code smells educational guide ([#21](https://github.com/cheickmec/smellcheck/issues/21)) ([40209fc](https://github.com/cheickmec/smellcheck/commit/40209fc41b98715e152df137f9b54c21d97d90e5))
+
+
+### Miscellaneous
+
+* remove outdated script from .gitignore ([7412f8b](https://github.com/cheickmec/smellcheck/commit/7412f8b6a2086c136d3cf03b0d1247fe3888a3ee))
+* update docs reminder script to include PR description note ([cce0106](https://github.com/cheickmec/smellcheck/commit/cce0106d61f711970ea0d4a92f972b213db1bc16))
+
 ## [0.2.5](https://github.com/cheickmec/smellcheck/compare/v0.2.4...v0.2.5) (2026-02-11)
 
 
