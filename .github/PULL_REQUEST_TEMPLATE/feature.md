@@ -1,19 +1,18 @@
+<!-- template:feature -->
+
 ## What does this PR do?
 
 Brief description of the change.
 
 ## Type of change
 
-- [ ] New smell check (add pattern number, e.g. `#071`)
-- [ ] Bug fix (false positive, false negative, crash)
+- [ ] New smell check
 - [ ] CLI / output improvement
-- [ ] Documentation
-- [ ] CI / tooling
-- [ ] Other
+- [ ] Other feature
 
 ## Checklist
 
-- [ ] `pytest tests/ -v` passes (all tests, including version parity)
+- [ ] `pytest tests/ -v` passes
 - [ ] New check has a test in `tests/test_detector.py`
 - [ ] `smellcheck src/smellcheck/` self-check runs clean (or new findings are intentional)
 - [ ] No dependencies added (stdlib only)
@@ -22,19 +21,25 @@ Brief description of the change.
 ## For new smell checks
 
 - **Pattern number**: `#___`
+- **SC code**: `SC___`
 - **Severity**: error / warning / info
-- **Category**: functions / classes / complexity / imports / ...
-- **Before** (smelly code):
+- **Family**: state / functions / types / control / architecture / hygiene / idioms / metrics
+
+**Before** (smelly code):
 
 ```python
 # paste example
 ```
 
-- **After** (clean code):
+**After** (clean code):
 
 ```python
 # paste example
 ```
+
+## Test plan
+
+How was this tested?
 
 ## Additional context
 
