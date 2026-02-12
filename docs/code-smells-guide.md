@@ -130,4 +130,4 @@ You don't need to fix every smell at once. For existing codebases:
 
 - Martin Fowler, *Refactoring: Improving the Design of Existing Code* (2nd ed., 2018) — the definitive reference
 - Sandro Mancuso, *The Software Craftsman* (2014) — on professional standards and clean code culture
-- smellcheck's [refactoring reference files](https://github.com/cheickmec/smellcheck/tree/main/plugins/python-refactoring/skills/python-refactoring/references) — before/after examples for all 82 patterns
+- smellcheck's [refactoring reference files](https://github.com/cheickmec/smellcheck/tree/main/plugins/python-refactoring/skills/python-refactoring/references) — before/after examples for all 83 patterns

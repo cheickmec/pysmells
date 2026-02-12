@@ -1,5 +1,5 @@
 name: 'smellcheck'
-description: 'Python code smell detector -- 55 AST checks, 82 refactoring patterns'
+description: 'Python code smell detector -- 56 AST checks, 83 refactoring patterns'
 branding:
   icon: 'search'
   color: 'yellow'

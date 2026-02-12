@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Python Code Smell Detector & Refactoring Guide</strong><br>
-  82 refactoring patterns &middot; 55 automated AST checks &middot; zero dependencies
+  83 refactoring patterns &middot; 56 automated AST checks &middot; zero dependencies
 </p>
 
 <p align="center">
@@ -61,30 +61,69 @@ repos:
 
 ### Agent Skills (Claude Code, Codex CLI, Cursor, Copilot, Roo Code, Gemini CLI)
 
-Any tool supporting the Agent Skills standard can install directly:
+A skill is a directory (`python-refactoring/`) containing `SKILL.md`, 8 reference files, and a detection script. Any tool supporting the [Agent Skills](https://agentskills.io) standard can install it.
+
+**Claude Code (native):**
 
 ```bash
-# Claude Code
 /plugin marketplace add cheickmec/smellcheck
 /plugin install python-refactoring@smellcheck
-
-# OpenAI Codex CLI
-$skill-installer install cheickmec/smellcheck
-
-# Cursor
-# Import from GitHub URL in skills settings
-
-# Or install from a local clone
-git clone https://github.com/cheickmec/smellcheck.git
-# Point your tool to plugins/python-refactoring/skills/python-refactoring/
 ```
 
-### Manual setup for other tools
+**OpenAI Codex CLI (native):**
 
-For tools without Agent Skills support (Aider, Windsurf, Continue.dev, Amazon Q), copy the relevant files into your project's instruction directory:
+```bash
+$skill-installer install cheickmec/smellcheck
+```
 
-- Copy `SKILL.md` content into your tool's instruction file (`.cursorrules`, `CONVENTIONS.md`, `.windsurf/rules/`, etc.)
-- Install with `pip install smellcheck` and run the `smellcheck` CLI
+**Gemini CLI (native):**
+
+```bash
+gemini skills install https://github.com/cheickmec/smellcheck.git \
+  --path plugins/python-refactoring/skills/python-refactoring
+```
+
+**Universal installer** (Claude Code, Cursor, Copilot, Codex, Gemini CLI, and more):
+
+```bash
+npx ai-agent-skills install cheickmec/smellcheck
+```
+
+**Manual install** (Cursor, VS Code/Copilot, Roo Code, Windsurf, or any Agent Skills tool):
+
+```bash
+# 1. Clone the repo
+git clone --depth 1 https://github.com/cheickmec/smellcheck.git /tmp/smellcheck
+
+# 2. Copy the skill directory into your tool's skills folder
+SKILL_SRC=/tmp/smellcheck/plugins/python-refactoring/skills/python-refactoring
+
+mkdir -p .cursor/skills && cp -r "$SKILL_SRC" .cursor/skills/      # Cursor
+mkdir -p .github/skills && cp -r "$SKILL_SRC" .github/skills/      # VS Code / Copilot
+mkdir -p .roo/skills && cp -r "$SKILL_SRC" .roo/skills/            # Roo Code
+mkdir -p .windsurf/skills && cp -r "$SKILL_SRC" .windsurf/skills/  # Windsurf
+mkdir -p .gemini/skills && cp -r "$SKILL_SRC" .gemini/skills/      # Gemini workspace
+
+# 3. Clean up
+rm -rf /tmp/smellcheck
+```
+
+### Tools without Agent Skills support
+
+For tools that only read flat markdown rule files, copy `SKILL.md` as a rule (the AI gets the smell catalog and can run the CLI, but won't have the reference files for refactoring guidance):
+
+```bash
+SKILL_URL=https://raw.githubusercontent.com/cheickmec/smellcheck/main/plugins/python-refactoring/skills/python-refactoring/SKILL.md
+
+# Continue.dev
+curl -fsSL "$SKILL_URL" -o .continue/rules/smellcheck.md
+
+# Amazon Q
+curl -fsSL "$SKILL_URL" -o .amazonq/rules/smellcheck.md
+
+# Aider (load at runtime, no install needed)
+aider --read /path/to/SKILL.md
+```
 
 ## Usage
 
@@ -174,8 +213,8 @@ Fingerprints are resilient to line-number changes — renaming or moving code ar
 
 ## Features
 
-- **55 automated smell checks** -- per-file AST analysis, cross-file dependency analysis, and OO metrics
-- **82 refactoring patterns** -- numbered catalog with before/after examples, trade-offs, and severity levels
+- **56 automated smell checks** -- per-file AST analysis, cross-file dependency analysis, and OO metrics
+- **83 refactoring patterns** -- numbered catalog with before/after examples, trade-offs, and severity levels
 - **Zero dependencies** -- stdlib-only, runs on any Python 3.10+ installation
 - **Multiple output formats** -- text (terminal), JSON (machine-readable), GitHub annotations (CI), SARIF 2.1.0 (Code Scanning)
 - **Configurable** -- pyproject.toml config, inline suppression, CLI overrides
@@ -295,7 +334,7 @@ Each pattern includes a description, before/after code examples, and trade-offs:
 | `control.md` | Guards, pipelines, conditionals, phases (SC402, SC403, SC207, SC404, 046, 047, 049, 053, SC405, 056, SC406, SC407) |
 | `architecture.md` | DI, singletons, exceptions, delegates (SC303, SC106, SC107, 035, 045, SC501, SC502, SC505, SC506, SC507, SC508) |
 | `hygiene.md` | Constants, dead code, comments, style (SC601, SC602, 011, SC606, SC401, 025, 031, 032, SC205, SC603, SC605) |
-| `idioms.md` | Context managers, generators, unpacking (SC701, SC702, 059, 060, SC304, SC305, SC604) |
+| `idioms.md` | Context managers, generators, unpacking, async (SC701, SC702, SC703, 059, 060, SC304, SC305, SC604) |
 | `metrics.md` | OO metrics: cohesion, coupling, fan-out, response, delegation (SC801, SC802, SC803, SC804, SC805) |
 
 ## Compatibility
@@ -305,23 +344,23 @@ Each pattern includes a description, before/after code examples, and trade-offs:
 | pip | `pip install smellcheck` | Native support |
 | GitHub Actions | `uses: cheickmec/smellcheck@v1` | Native support |
 | pre-commit | `.pre-commit-config.yaml` | Native support |
-| Claude Code | `/plugin install` | Native support |
-| OpenAI Codex CLI | `$skill-installer` | Native support |
-| Cursor | GitHub import / `.cursor/skills/` | Native support |
-| GitHub Copilot | MCP gallery | Native support |
-| Roo Code | `.roo/` directory | Native support |
-| Gemini CLI | Agent Skills | Native support |
-| Windsurf | Copy to `.windsurf/rules/` | Manual |
-| Aider | `--read CONVENTIONS.md` | Manual |
-| Continue.dev | `.continue/rules/` | Manual |
+| Claude Code | `/plugin marketplace add` | Native support |
+| OpenAI Codex CLI | `$skill-installer install` | Native support |
+| Cursor | Settings > Rules > Remote Rule | Native support |
+| GitHub Copilot | `.github/skills/` | Native support |
+| Roo Code | `.roo/skills/` | Native support |
+| Gemini CLI | `.gemini/skills/` | Native support |
+| Windsurf | `.windsurf/skills/` | Manual |
+| Continue.dev | `.continue/rules/` or Hub `uses:` | Manual |
 | Amazon Q | `.amazonq/rules/` | Manual |
+| Aider | `--read SKILL.md` | Manual |
 
 ## How It Compares
 
 | Feature | smellcheck | PyExamine | SMART-Dal | Pyscent |
 |---------|------------|-----------|-----------|---------|
-| Automated detections | 55 | 49 | 31 | 11 |
-| Refactoring guidance | 82 patterns | None | None | None |
+| Automated detections | 56 | 49 | 31 | 11 |
+| Refactoring guidance | 83 patterns | None | None | None |
 | Dependencies | 0 (stdlib) | pylint, radon | DesigniteJava | pylint, radon, cohesion |
 | Python-specific idioms | Yes | No | No | No |
 | Cross-file analysis | Yes | Limited | Yes | No |

@@ -73,4 +73,4 @@ SC codes work in `--select`, `--ignore`, and `# noqa` comments.
 - `tests/test_detector.py` — main test suite
 - `tests/test_regressions.py` — edge cases and false-positive guards
 - `tests/test_version_parity.py` — ensures version consistency across config files
-- `plugins/python-refactoring/` — Agent Skills plugin with SKILL.md and 8 reference files (the 82-pattern refactoring catalog)
+- `plugins/python-refactoring/` — Agent Skills plugin with SKILL.md and 8 reference files (the 83-pattern refactoring catalog)
