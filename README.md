@@ -112,10 +112,10 @@ smellcheck src/ --fail-on warning   # exit 1 on warning or error
 smellcheck src/ --fail-on info      # exit 1 on any finding
 
 # Run only specific checks
-smellcheck src/ --select 001,057,CC
+smellcheck src/ --select SC101,SC701,SC210
 
 # Skip specific checks
-smellcheck src/ --ignore 003,006
+smellcheck src/ --ignore SC601,SC202
 
 # Module execution
 python3 -m smellcheck src/
@@ -133,9 +133,9 @@ smellcheck reads `[tool.smellcheck]` from the nearest `pyproject.toml`:
 
 ```toml
 [tool.smellcheck]
-select = ["001", "002", "057"]       # only run these checks (default: all)
-ignore = ["003", "006"]              # skip these checks
-per-file-ignores = {"tests/*" = ["002", "034"]}  # per-path overrides
+select = ["SC101", "SC201", "SC701"]  # only run these checks (default: all)
+ignore = ["SC601", "SC202"]          # skip these checks
+per-file-ignores = {"tests/*" = ["SC201", "SC206"]}  # per-path overrides
 fail-on = "warning"                  # override default fail-on
 format = "text"                      # override default format
 baseline = ".smellcheck-baseline.json"  # suppress known findings
@@ -145,14 +145,14 @@ CLI flags override config values.
 
 ## Inline Suppression
 
-Add `# noqa: SC057` to a line to suppress pattern #057 on that line:
+Add `# noqa: SC701` to a line to suppress that check on that line:
 
 ```python
-def foo(x=[]):  # noqa: SC057
+def foo(x=[]):  # noqa: SC701
     return x
 ```
 
-Use `# noqa` (no codes) to suppress all findings on that line. Multiple codes: `# noqa: SC003,SC006`
+Use `# noqa` (no codes) to suppress all findings on that line. Multiple codes: `# noqa: SC601,SC202`
 
 ## Baseline
 
@@ -210,78 +210,78 @@ Results include stable fingerprints for deduplication across runs.
 
 ## Detected Patterns
 
-Every rule has a unified **SC code** (e.g. `SC701`) and a legacy **pattern ref** (e.g. `057`). Both forms work in `--select`, `--ignore`, and `# noqa` comments.
+Every rule is identified by an **SC code** (e.g. `SC701`). Use SC codes in `--select`, `--ignore`, and `# noqa` comments.
 
 ### Per-File (41 checks)
 
-| SC Code | # | Pattern | Severity |
-|---------|---|---------|----------|
-| SC101 | 001 | Setters (half-built objects) | warning |
-| SC102 | 008 | UPPER_CASE without Final | info |
-| SC103 | 009 | Unprotected public attributes | info |
-| SC104 | 016 | Half-built objects (init assigns None) | warning |
-| SC105 | 017 | Boolean flag parameters | info |
-| SC106 | 024 | Global mutable state | info |
-| SC107 | 028 | Sequential IDs | info |
-| SC201 | 002 | Long functions (>20 lines) | warning |
-| SC202 | 006 | Generic names (data, result, tmp) | info |
-| SC203 | 026 | input() in business logic | warning |
-| SC204 | 029 | Functions returning None or list | info |
-| SC205 | 033 | Excessive decorators (>3) | info |
-| SC206 | 034 | Too many parameters (>5) | warning |
-| SC207 | 041 | CQS violation (query + modify) | info |
-| SC208 | 064 | Unused function parameters | warning |
-| SC209 | 066 | Long lambda (>60 chars) | info |
-| SC210 | CC | Cyclomatic complexity (>10) | warning |
-| SC301 | 007 | Extract class (too many methods) | info |
-| SC302 | 014 | isinstance chains | warning |
-| SC303 | 018 | Singleton pattern | warning |
-| SC304 | 061 | Dataclass candidate | info |
-| SC305 | 062 | Sequential tuple indexing | info |
-| SC306 | 069 | Lazy class (<2 methods) | info |
-| SC307 | 070 | Temporary fields | warning |
-| SC401 | 021 | Dead code after return | warning |
-| SC402 | 039 | Deep nesting (>4 levels) | warning |
-| SC403 | 040 | Loop + append pattern | info |
-| SC404 | 042 | Complex boolean expressions | warning |
-| SC405 | 055 | Boolean control flag in loop | info |
-| SC406 | 067 | Complex comprehension (>2 generators) | info |
-| SC407 | 068 | Missing default else branch | info |
-| SC501 | 051 | Error codes instead of exceptions | warning |
-| SC502 | 054 | Law of Demeter violation | info |
-| SC601 | 003 | Magic numbers | info |
-| SC602 | 004 | Bare except / unused exception variable | error |
-| SC603 | 036 | String concatenation for multiline | info |
-| SC604 | 063 | contextlib candidate | info |
-| SC605 | 065 | Empty catch block | warning |
-| SC701 | 057 | Mutable default arguments | error |
-| SC702 | 058 | open() without context manager | warning |
-| SC703 | 071 | Blocking calls in async functions | warning |
+| SC Code | Pattern | Severity |
+|---------|---------|----------|
+| SC101 | Setters (half-built objects) | warning |
+| SC102 | UPPER_CASE without Final | info |
+| SC103 | Unprotected public attributes | info |
+| SC104 | Half-built objects (init assigns None) | warning |
+| SC105 | Boolean flag parameters | info |
+| SC106 | Global mutable state | info |
+| SC107 | Sequential IDs | info |
+| SC201 | Long functions (>20 lines) | warning |
+| SC202 | Generic names (data, result, tmp) | info |
+| SC203 | input() in business logic | warning |
+| SC204 | Functions returning None or list | info |
+| SC205 | Excessive decorators (>3) | info |
+| SC206 | Too many parameters (>5) | warning |
+| SC207 | CQS violation (query + modify) | info |
+| SC208 | Unused function parameters | warning |
+| SC209 | Long lambda (>60 chars) | info |
+| SC210 | Cyclomatic complexity (>10) | warning |
+| SC301 | Extract class (too many methods) | info |
+| SC302 | isinstance chains | warning |
+| SC303 | Singleton pattern | warning |
+| SC304 | Dataclass candidate | info |
+| SC305 | Sequential tuple indexing | info |
+| SC306 | Lazy class (<2 methods) | info |
+| SC307 | Temporary fields | warning |
+| SC401 | Dead code after return | warning |
+| SC402 | Deep nesting (>4 levels) | warning |
+| SC403 | Loop + append pattern | info |
+| SC404 | Complex boolean expressions | warning |
+| SC405 | Boolean control flag in loop | info |
+| SC406 | Complex comprehension (>2 generators) | info |
+| SC407 | Missing default else branch | info |
+| SC501 | Error codes instead of exceptions | warning |
+| SC502 | Law of Demeter violation | info |
+| SC601 | Magic numbers | info |
+| SC602 | Bare except / unused exception variable | error |
+| SC603 | String concatenation for multiline | info |
+| SC604 | contextlib candidate | info |
+| SC605 | Empty catch block | warning |
+| SC701 | Mutable default arguments | error |
+| SC702 | open() without context manager | warning |
+| SC703 | Blocking calls in async functions | warning |
 
 ### Cross-File (10 checks)
 
-| SC Code | # | Pattern | Description |
-|---------|---|---------|-------------|
-| SC211 | FE | Feature envy | Function accesses external attributes more than own |
-| SC308 | DIT | Deep inheritance | Inheritance depth >4 |
-| SC309 | WHI | Wide hierarchy | >5 direct subclasses |
-| SC503 | CYC | Cyclic imports | DFS cycle detection |
-| SC504 | GOD | God modules | >500 lines or >30 top-level definitions |
-| SC505 | SHO | Shotgun surgery | Function called from >5 different files |
-| SC506 | INT | Inappropriate intimacy | >3 bidirectional class references between files |
-| SC507 | SPG | Speculative generality | Abstract class with no concrete subclasses |
-| SC508 | UDE | Unstable dependency | Stable module depends on unstable module |
-| SC606 | 013 | Duplicate functions | AST-normalized hashing across files |
+| SC Code | Pattern | Description |
+|---------|---------|-------------|
+| SC211 | Feature envy | Function accesses external attributes more than own |
+| SC308 | Deep inheritance | Inheritance depth >4 |
+| SC309 | Wide hierarchy | >5 direct subclasses |
+| SC503 | Cyclic imports | DFS cycle detection |
+| SC504 | God modules | >500 lines or >30 top-level definitions |
+| SC505 | Shotgun surgery | Function called from >5 different files |
+| SC506 | Inappropriate intimacy | >3 bidirectional class references between files |
+| SC507 | Speculative generality | Abstract class with no concrete subclasses |
+| SC508 | Unstable dependency | Stable module depends on unstable module |
+| SC606 | Duplicate functions | AST-normalized hashing across files |
 
 ### OO Metrics (5 checks)
 
-| SC Code | # | Metric | Threshold |
-|---------|---|--------|-----------|
-| SC801 | LCOM | Lack of Cohesion of Methods | >0.8 |
-| SC802 | CBO | Coupling Between Objects | >8 |
-| SC803 | FIO | Excessive Fan-Out | >15 |
-| SC804 | RFC | Response for a Class | >20 |
-| SC805 | MID | Middle Man (delegation ratio) | >50% |
+| SC Code | Metric | Threshold |
+|---------|--------|-----------|
+| SC801 | Lack of Cohesion of Methods | >0.8 |
+| SC802 | Coupling Between Objects | >8 |
+| SC803 | Excessive Fan-Out | >15 |
+| SC804 | Response for a Class | >20 |
+| SC805 | Middle Man (delegation ratio) | >50% |
 
 ## Refactoring Reference Files
 
@@ -289,14 +289,14 @@ Each pattern includes a description, before/after code examples, and trade-offs:
 
 | File | Patterns |
 |------|----------|
-| `state.md` | Immutability, setters, attributes (001, 008, 009, 016, 017, 030) |
-| `functions.md` | Extraction, naming, parameters, CQS (002, 010, 020, 026, 027, 034, 037, 041, 050, 052, 064, 066) |
-| `types.md` | Classes, reification, polymorphism, nulls (007, 012, 014, 015, 019, 022, 023, 029, 038, 044, 048, 069, 070, DIT, WHI) |
-| `control.md` | Guards, pipelines, conditionals, phases (039-043, 046, 047, 049, 053, 055, 056, 067, 068) |
-| `architecture.md` | DI, singletons, exceptions, delegates (018, 024, 028, 035, 045, 051, 054, SHO, INT, SPG, UDE) |
-| `hygiene.md` | Constants, dead code, comments, style (003, 004, 011, 013, 021, 025, 031-033, 036, 065) |
-| `idioms.md` | Context managers, generators, unpacking (057-063) |
-| `metrics.md` | OO metrics: cohesion, coupling, fan-out, response, delegation (LCOM, CBO, FIO, RFC, MID) |
+| `state.md` | Immutability, setters, attributes (SC101, SC102, SC103, SC104, SC105, 030) |
+| `functions.md` | Extraction, naming, parameters, CQS (SC201, 010, 020, SC203, 027, SC206, 037, SC207, 050, 052, SC208, SC209) |
+| `types.md` | Classes, reification, polymorphism, nulls (SC301, 012, SC302, 015, 019, 022, 023, SC204, 038, 044, 048, SC306, SC307, SC308, SC309) |
+| `control.md` | Guards, pipelines, conditionals, phases (SC402, SC403, SC207, SC404, 046, 047, 049, 053, SC405, 056, SC406, SC407) |
+| `architecture.md` | DI, singletons, exceptions, delegates (SC303, SC106, SC107, 035, 045, SC501, SC502, SC505, SC506, SC507, SC508) |
+| `hygiene.md` | Constants, dead code, comments, style (SC601, SC602, 011, SC606, SC401, 025, 031, 032, SC205, SC603, SC605) |
+| `idioms.md` | Context managers, generators, unpacking (SC701, SC702, 059, 060, SC304, SC305, SC604) |
+| `metrics.md` | OO metrics: cohesion, coupling, fan-out, response, delegation (SC801, SC802, SC803, SC804, SC805) |
 
 ## Compatibility
 

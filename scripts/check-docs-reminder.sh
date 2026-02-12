@@ -15,6 +15,7 @@ fi
 DOC_PATTERNS=(
   "README.md"
   "CONTRIBUTING.md"
+  "CLAUDE.md"
   "plugins/python-refactoring/skills/python-refactoring/SKILL.md"
   "plugins/python-refactoring/skills/python-refactoring/references/"
 )
@@ -37,6 +38,7 @@ echo -e "${YELLOW}│                                                         �
 echo -e "${YELLOW}│  If your change affects any of these, update them too:  │${RESET}" >&2
 echo -e "${YELLOW}│    • README.md          (features, CLI options, usage)  │${RESET}" >&2
 echo -e "${YELLOW}│    • CONTRIBUTING.md    (architecture, adding checks)   │${RESET}" >&2
+echo -e "${YELLOW}│    • CLAUDE.md          (data structures, conventions)  │${RESET}" >&2
 echo -e "${YELLOW}│    • SKILL.md + refs/   (pattern catalog & families)    │${RESET}" >&2
 echo -e "${YELLOW}│                                                         │${RESET}" >&2
 echo -e "${YELLOW}│  CHANGELOG.md is auto-generated — no action needed.    │${RESET}" >&2

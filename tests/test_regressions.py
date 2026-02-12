@@ -52,7 +52,7 @@ def test_rfc_counts_methods_not_classes(tmp_path):
                 pass
     """)
     findings = scan_path(p)
-    rfc_findings = [f for f in findings if f.pattern == "#RFC"]
+    rfc_findings = [f for f in findings if f.pattern == "SC804"]
     # Foo has 3 methods + 0 external calls = RFC 3, below default threshold of 20
     assert len(rfc_findings) == 0
 
@@ -91,7 +91,7 @@ def test_exitstack_no_false_positive_058(tmp_path):
                 return f.read()
     """)
     findings = scan_path(p)
-    f058 = [f for f in findings if f.pattern == "#058"]
+    f058 = [f for f in findings if f.pattern == "SC702"]
     # The open() is wrapped in enter_context, so no #058
     assert len(f058) == 0
 
@@ -139,7 +139,7 @@ def test_single_file_runs_oo_metrics(tmp_path):
     findings = scan_path(p)
     metric_patterns = {f.pattern for f in findings}
     # Should detect LCOM (each method uses only 1 of 8 fields)
-    assert "#LCOM" in metric_patterns
+    assert "SC801" in metric_patterns
 
 
 # --- Regression: min-severity rejects invalid values ---
@@ -161,15 +161,15 @@ def test_007_extract_class_detected(tmp_path):
     p = _write_py(tmp_path, f"class Bloated:\n{methods}\n")
     findings = scan_path(p)
     patterns = [f.pattern for f in findings]
-    assert "#007" in patterns
+    assert "SC301" in patterns
 
 
 # --- Regression: noqa suppression codes are case-insensitive ---
 
 def test_noqa_code_case_insensitive(tmp_path):
-    """``# noqa: sc057`` (lowercase) should also suppress #057."""
-    p = _write_py(tmp_path, "def foo(x=[]):  # noqa: sc057\n    pass\n")
+    """``# noqa: sc701`` (lowercase) should also suppress SC701."""
+    p = _write_py(tmp_path, "def foo(x=[]):  # noqa: sc701\n    pass\n")
     findings = scan_paths([p])
     patterns = [f.pattern for f in findings]
-    # _is_suppressed uppercases codes, so sc057 -> SC057 should match
-    assert "#057" not in patterns
+    # _is_suppressed uppercases codes, so sc701 -> SC701 should match
+    assert "SC701" not in patterns

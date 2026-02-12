@@ -413,11 +413,11 @@ Now the service layer adds real value: event publishing, domain operations, orch
 
 | Metric | Related Patterns | Connection |
 |--------|-----------------|------------|
-| LCOM | #002 (extract method), #007 (extract class) | Low cohesion often means the class should be split |
-| CBO | #054 (Law of Demeter), #020 (dependency injection) | High coupling indicates tight dependencies |
-| FIO | #002 (extract method), #047 (separate phases) | High fan-out means the method does too much |
-| RFC | #034 (too many params), #052 (parameter objects) | High RFC correlates with complex interfaces |
-| MID | #069 (lazy class) | Middle men are a special case of lazy classes that only delegate |
+| SC801 | SC201 (extract method), SC301 (extract class) | Low cohesion often means the class should be split |
+| SC802 | SC502 (Law of Demeter), #020 (dependency injection) | High coupling indicates tight dependencies |
+| SC803 | SC201 (extract method), #047 (separate phases) | High fan-out means the method does too much |
+| SC804 | SC206 (too many params), #052 (parameter objects) | High RFC correlates with complex interfaces |
+| SC805 | SC306 (lazy class) | Middle men are a special case of lazy classes that only delegate |
 
 ## Detection
 

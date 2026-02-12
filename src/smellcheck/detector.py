@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Python Code Smell Detector — maps findings to the 82-pattern refactoring catalog.
+Python Code Smell Detector — SC-coded rules organized by family.
 
 Self-contained: stdlib only (ast, pathlib, sys, json, collections, re, textwrap).
 Detects 56 patterns programmatically (41 per-file + 10 cross-file + 5 OO metrics).
@@ -51,7 +51,6 @@ class RuleDef:
     """Metadata for a single smellcheck rule."""
 
     rule_id: str  # e.g. "SC701"
-    pattern_ref: str  # e.g. "057" — catalog link
     name: str
     family: str  # state|functions|types|control|architecture|hygiene|idioms|metrics
     scope: str  # file|cross_file|metric
@@ -61,144 +60,139 @@ class RuleDef:
 # fmt: off
 _RULE_REGISTRY: dict[str, RuleDef] = {
     # --- Family 1: State & Immutability (SC1xx) ---
-    "#001": RuleDef("SC101", "001", "Remove Setters", "state", "file", "warning"),
-    "#008": RuleDef("SC102", "008", "Convert Variables to Constants", "state", "file", "info"),
-    "#009": RuleDef("SC103", "009", "Protect Public Attributes", "state", "file", "info"),
-    "#016": RuleDef("SC104", "016", "Build With The Essence", "state", "file", "warning"),
-    "#017": RuleDef("SC105", "017", "Convert Attributes to Sets", "state", "file", "info"),
-    "#024": RuleDef("SC106", "024", "Replace Global Variables with DI", "state", "file", "info"),
-    "#028": RuleDef("SC107", "028", "Replace Sequential IDs", "state", "file", "info"),
+    "SC101": RuleDef("SC101", "Remove Setters", "state", "file", "warning"),
+    "SC102": RuleDef("SC102", "Convert Variables to Constants", "state", "file", "info"),
+    "SC103": RuleDef("SC103", "Protect Public Attributes", "state", "file", "info"),
+    "SC104": RuleDef("SC104", "Build With The Essence", "state", "file", "warning"),
+    "SC105": RuleDef("SC105", "Convert Attributes to Sets", "state", "file", "info"),
+    "SC106": RuleDef("SC106", "Replace Global Variables with DI", "state", "file", "info"),
+    "SC107": RuleDef("SC107", "Replace Sequential IDs", "state", "file", "info"),
     # --- Family 2: Functions (SC2xx) ---
-    "#002": RuleDef("SC201", "002", "Extract Method", "functions", "file", "warning"),
-    "#006": RuleDef("SC202", "006", "Rename Result Variables", "functions", "file", "info"),
-    "#026": RuleDef("SC203", "026", "Replace input() Calls", "functions", "file", "warning"),
-    "#029": RuleDef("SC204", "029", "Replace NULL with Collection", "functions", "file", "info"),
-    "#033": RuleDef("SC205", "033", "Strip Annotations", "functions", "file", "info"),
-    "#034": RuleDef("SC206", "034", "Reify Parameters", "functions", "file", "warning"),
-    "#041": RuleDef("SC207", "041", "Separate Query from Modifier", "functions", "file", "info"),
-    "#064": RuleDef("SC208", "064", "Remove Unused Parameters", "functions", "file", "warning"),
-    "#066": RuleDef("SC209", "066", "Replace Long Lambda with Function", "functions", "file", "info"),
-    "#CC":  RuleDef("SC210", "CC", "Reduce Cyclomatic Complexity", "functions", "file", "warning"),
-    "#FE":  RuleDef("SC211", "FE", "Move Method (Feature Envy)", "functions", "cross_file", "info"),
+    "SC201": RuleDef("SC201", "Extract Method", "functions", "file", "warning"),
+    "SC202": RuleDef("SC202", "Rename Result Variables", "functions", "file", "info"),
+    "SC203": RuleDef("SC203", "Replace input() Calls", "functions", "file", "warning"),
+    "SC204": RuleDef("SC204", "Replace NULL with Collection", "functions", "file", "info"),
+    "SC205": RuleDef("SC205", "Strip Annotations", "functions", "file", "info"),
+    "SC206": RuleDef("SC206", "Reify Parameters", "functions", "file", "warning"),
+    "SC207": RuleDef("SC207", "Separate Query from Modifier", "functions", "file", "info"),
+    "SC208": RuleDef("SC208", "Remove Unused Parameters", "functions", "file", "warning"),
+    "SC209": RuleDef("SC209", "Replace Long Lambda with Function", "functions", "file", "info"),
+    "SC210": RuleDef("SC210", "Reduce Cyclomatic Complexity", "functions", "file", "warning"),
+    "SC211": RuleDef("SC211", "Move Method (Feature Envy)", "functions", "cross_file", "info"),
     # --- Family 3: Types & Classes (SC3xx) ---
-    "#007": RuleDef("SC301", "007", "Extract Class", "types", "file", "info"),
-    "#014": RuleDef("SC302", "014", "Replace IF with Polymorphism", "types", "file", "warning"),
-    "#018": RuleDef("SC303", "018", "Replace Singleton", "types", "file", "warning"),
-    "#061": RuleDef("SC304", "061", "Replace Class with Dataclass", "types", "file", "info"),
-    "#062": RuleDef("SC305", "062", "Use Unpacking Instead of Indexing", "types", "file", "info"),
-    "#069": RuleDef("SC306", "069", "Remove Lazy Class", "types", "file", "info"),
-    "#070": RuleDef("SC307", "070", "Remove Temporary Field", "types", "file", "info"),
-    "#DIT": RuleDef("SC308", "DIT", "Deep Inheritance Tree", "types", "cross_file", "warning"),
-    "#WHI": RuleDef("SC309", "WHI", "Wide Hierarchy", "types", "cross_file", "info"),
+    "SC301": RuleDef("SC301", "Extract Class", "types", "file", "info"),
+    "SC302": RuleDef("SC302", "Replace IF with Polymorphism", "types", "file", "warning"),
+    "SC303": RuleDef("SC303", "Replace Singleton", "types", "file", "warning"),
+    "SC304": RuleDef("SC304", "Replace Class with Dataclass", "types", "file", "info"),
+    "SC305": RuleDef("SC305", "Use Unpacking Instead of Indexing", "types", "file", "info"),
+    "SC306": RuleDef("SC306", "Remove Lazy Class", "types", "file", "info"),
+    "SC307": RuleDef("SC307", "Remove Temporary Field", "types", "file", "info"),
+    "SC308": RuleDef("SC308", "Deep Inheritance Tree", "types", "cross_file", "warning"),
+    "SC309": RuleDef("SC309", "Wide Hierarchy", "types", "cross_file", "info"),
     # --- Family 4: Control Flow (SC4xx) ---
-    "#021": RuleDef("SC401", "021", "Remove Dead Code", "control", "file", "warning"),
-    "#039": RuleDef("SC402", "039", "Replace Nested Conditional with Guard Clauses", "control", "file", "warning"),
-    "#040": RuleDef("SC403", "040", "Replace Loop with Pipeline", "control", "file", "info"),
-    "#042": RuleDef("SC404", "042", "Decompose Conditional", "control", "file", "warning"),
-    "#055": RuleDef("SC405", "055", "Replace Control Flag with Break", "control", "file", "info"),
-    "#067": RuleDef("SC406", "067", "Simplify Complex Comprehension", "control", "file", "info"),
-    "#068": RuleDef("SC407", "068", "Add Default Else Branch", "control", "file", "info"),
+    "SC401": RuleDef("SC401", "Remove Dead Code", "control", "file", "warning"),
+    "SC402": RuleDef("SC402", "Replace Nested Conditional with Guard Clauses", "control", "file", "warning"),
+    "SC403": RuleDef("SC403", "Replace Loop with Pipeline", "control", "file", "info"),
+    "SC404": RuleDef("SC404", "Decompose Conditional", "control", "file", "warning"),
+    "SC405": RuleDef("SC405", "Replace Control Flag with Break", "control", "file", "info"),
+    "SC406": RuleDef("SC406", "Simplify Complex Comprehension", "control", "file", "info"),
+    "SC407": RuleDef("SC407", "Add Default Else Branch", "control", "file", "info"),
     # --- Family 5: Architecture (SC5xx) ---
-    "#051": RuleDef("SC501", "051", "Replace Error Codes with Exceptions", "architecture", "file", "warning"),
-    "#054": RuleDef("SC502", "054", "Law of Demeter", "architecture", "file", "info"),
-    "#CYC": RuleDef("SC503", "CYC", "Break Cyclic Import", "architecture", "cross_file", "warning"),
-    "#GOD": RuleDef("SC504", "GOD", "Split God Module", "architecture", "cross_file", "warning"),
-    "#SHO": RuleDef("SC505", "SHO", "Shotgun Surgery", "architecture", "cross_file", "info"),
-    "#INT": RuleDef("SC506", "INT", "Inappropriate Intimacy", "architecture", "cross_file", "info"),
-    "#SPG": RuleDef("SC507", "SPG", "Remove Speculative Generality", "architecture", "cross_file", "info"),
-    "#UDE": RuleDef("SC508", "UDE", "Unstable Dependency", "architecture", "cross_file", "info"),
+    "SC501": RuleDef("SC501", "Replace Error Codes with Exceptions", "architecture", "file", "warning"),
+    "SC502": RuleDef("SC502", "Law of Demeter", "architecture", "file", "info"),
+    "SC503": RuleDef("SC503", "Break Cyclic Import", "architecture", "cross_file", "warning"),
+    "SC504": RuleDef("SC504", "Split God Module", "architecture", "cross_file", "warning"),
+    "SC505": RuleDef("SC505", "Shotgun Surgery", "architecture", "cross_file", "info"),
+    "SC506": RuleDef("SC506", "Inappropriate Intimacy", "architecture", "cross_file", "info"),
+    "SC507": RuleDef("SC507", "Remove Speculative Generality", "architecture", "cross_file", "info"),
+    "SC508": RuleDef("SC508", "Unstable Dependency", "architecture", "cross_file", "info"),
     # --- Family 6: Hygiene (SC6xx) ---
-    "#003": RuleDef("SC601", "003", "Extract Constant", "hygiene", "file", "info"),
-    "#004": RuleDef("SC602", "004", "Remove Unhandled Exceptions", "hygiene", "file", "error"),
-    "#036": RuleDef("SC603", "036", "Replace String Concatenation", "hygiene", "file", "info"),
-    "#063": RuleDef("SC604", "063", "Replace with contextlib", "hygiene", "file", "info"),
-    "#065": RuleDef("SC605", "065", "Remove Empty Catch Block", "hygiene", "file", "warning"),
-    "#013": RuleDef("SC606", "013", "Remove Duplicated Code", "hygiene", "cross_file", "warning"),
+    "SC601": RuleDef("SC601", "Extract Constant", "hygiene", "file", "info"),
+    "SC602": RuleDef("SC602", "Remove Unhandled Exceptions", "hygiene", "file", "error"),
+    "SC603": RuleDef("SC603", "Replace String Concatenation", "hygiene", "file", "info"),
+    "SC604": RuleDef("SC604", "Replace with contextlib", "hygiene", "file", "info"),
+    "SC605": RuleDef("SC605", "Remove Empty Catch Block", "hygiene", "file", "warning"),
+    "SC606": RuleDef("SC606", "Remove Duplicated Code", "hygiene", "cross_file", "warning"),
     # --- Family 7: Idioms (SC7xx) ---
-    "#057": RuleDef("SC701", "057", "Replace Mutable Default Arguments", "idioms", "file", "error"),
-    "#058": RuleDef("SC702", "058", "Use Context Managers", "idioms", "file", "warning"),
-    "#071": RuleDef("SC703", "071", "Avoid Blocking Calls in Async Functions", "idioms", "file", "warning"),
+    "SC701": RuleDef("SC701", "Replace Mutable Default Arguments", "idioms", "file", "error"),
+    "SC702": RuleDef("SC702", "Use Context Managers", "idioms", "file", "warning"),
+    "SC703": RuleDef("SC703", "Avoid Blocking Calls in Async Functions", "idioms", "file", "warning"),
     # --- Family 8: Metrics (SC8xx) ---
-    "#LCOM": RuleDef("SC801", "LCOM", "Low Class Cohesion", "metrics", "metric", "warning"),
-    "#CBO":  RuleDef("SC802", "CBO", "High Coupling Between Objects", "metrics", "metric", "warning"),
-    "#FIO":  RuleDef("SC803", "FIO", "Excessive Fan-Out", "metrics", "metric", "info"),
-    "#RFC":  RuleDef("SC804", "RFC", "High Response for Class", "metrics", "metric", "info"),
-    "#MID":  RuleDef("SC805", "MID", "Remove Middle Man", "metrics", "metric", "info"),
+    "SC801": RuleDef("SC801", "Low Class Cohesion", "metrics", "metric", "warning"),
+    "SC802": RuleDef("SC802", "High Coupling Between Objects", "metrics", "metric", "warning"),
+    "SC803": RuleDef("SC803", "Excessive Fan-Out", "metrics", "metric", "info"),
+    "SC804": RuleDef("SC804", "High Response for Class", "metrics", "metric", "info"),
+    "SC805": RuleDef("SC805", "Remove Middle Man", "metrics", "metric", "info"),
 }
 # fmt: on
 
-# Reverse lookup: rule_id -> legacy pattern (e.g. "SC701" -> "#057")
-_RULE_ID_TO_LEGACY: dict[str, str] = {
-    rd.rule_id: pat for pat, rd in _RULE_REGISTRY.items()
-}
-
 # fmt: off
-# Descriptions for SARIF help metadata (pattern_ref -> smell description).
+# Descriptions for SARIF help metadata (rule_id -> smell description).
 _RULE_DESCRIPTIONS: dict[str, str] = {
     # State & Immutability
-    "001": "Mutable state via setters leads to half-built objects and unpredictable mutations.",
-    "008": "Values that never change are declared as mutable variables instead of constants.",
-    "009": "Exposed public attributes let anyone mutate internal state arbitrarily.",
-    "016": "Objects created empty then populated piecemeal — callers see half-built state.",
-    "017": "Boolean flags for every possible state or role instead of polymorphism or enums.",
-    "024": "Hidden global mutable state makes functions impure and hard to test.",
-    "028": "Sequential auto-incrementing IDs leak information and enable scraping.",
+    "SC101": "Mutable state via setters leads to half-built objects and unpredictable mutations.",
+    "SC102": "Values that never change are declared as mutable variables instead of constants.",
+    "SC103": "Exposed public attributes let anyone mutate internal state arbitrarily.",
+    "SC104": "Objects created empty then populated piecemeal — callers see half-built state.",
+    "SC105": "Boolean flags for every possible state or role instead of polymorphism or enums.",
+    "SC106": "Hidden global mutable state makes functions impure and hard to test.",
+    "SC107": "Sequential auto-incrementing IDs leak information and enable scraping.",
     # Functions
-    "002": "Function is too long — doing multiple things that should be separate methods.",
-    "006": "Generic variable names like 'result', 'data', 'tmp' obscure intent.",
-    "026": "input() calls baked into business logic prevent testing and reuse.",
-    "029": "Returning None or a list forces every caller to check the return type.",
-    "033": "More decorators stacked on a function than lines of actual logic.",
-    "034": "Long parameter list of loosely related values — consider a parameter object.",
-    "041": "Function both returns a value and changes state (CQS violation).",
-    "064": "Parameters declared in the signature but never referenced in the function body.",
-    "066": "Lambda expression too long to read as a one-liner — use a named function.",
-    "CC":  "Too many independent paths through a function, making it hard to test.",
-    "FE":  "A method uses more attributes from another class than from its own.",
+    "SC201": "Function is too long — doing multiple things that should be separate methods.",
+    "SC202": "Generic variable names like 'result', 'data', 'tmp' obscure intent.",
+    "SC203": "input() calls baked into business logic prevent testing and reuse.",
+    "SC204": "Returning None or a list forces every caller to check the return type.",
+    "SC205": "More decorators stacked on a function than lines of actual logic.",
+    "SC206": "Long parameter list of loosely related values — consider a parameter object.",
+    "SC207": "Function both returns a value and changes state (CQS violation).",
+    "SC208": "Parameters declared in the signature but never referenced in the function body.",
+    "SC209": "Lambda expression too long to read as a one-liner — use a named function.",
+    "SC210": "Too many independent paths through a function, making it hard to test.",
+    "SC211": "A method uses more attributes from another class than from its own.",
     # Types & Classes
-    "007": "Related behavior is scattered across the codebase with no cohesive class.",
-    "014": "Type-checking isinstance/if-elif chains — use polymorphism instead.",
-    "018": "Singleton pattern: global shared state disguised as a design pattern.",
-    "061": "Boilerplate __init__/__repr__/__eq__ that @dataclass would generate.",
-    "062": "Accessing tuple/list elements by numeric index is cryptic and fragile.",
-    "069": "Class has too few methods and fields to justify its existence.",
-    "070": "Instance attributes set in __init__ but used in very few methods.",
-    "DIT": "Inheritance chain deeper than 3 levels makes the hierarchy hard to follow.",
-    "WHI": "A class with too many direct subclasses — overly broad abstraction.",
+    "SC301": "Related behavior is scattered across the codebase with no cohesive class.",
+    "SC302": "Type-checking isinstance/if-elif chains — use polymorphism instead.",
+    "SC303": "Singleton pattern: global shared state disguised as a design pattern.",
+    "SC304": "Boilerplate __init__/__repr__/__eq__ that @dataclass would generate.",
+    "SC305": "Accessing tuple/list elements by numeric index is cryptic and fragile.",
+    "SC306": "Class has too few methods and fields to justify its existence.",
+    "SC307": "Instance attributes set in __init__ but used in very few methods.",
+    "SC308": "Inheritance chain deeper than 3 levels makes the hierarchy hard to follow.",
+    "SC309": "A class with too many direct subclasses — overly broad abstraction.",
     # Control Flow
-    "021": "Dead code: unused functions, unreachable branches, or commented-out blocks.",
-    "039": "Deep nesting obscures the happy path — use guard clauses instead.",
-    "040": "Imperative for-loop with .append() — use a list comprehension or pipeline.",
-    "042": "Complex boolean expression that is hard to parse mentally.",
-    "055": "Boolean flag variable controlling loop flow instead of break/continue.",
-    "067": "Comprehension is too nested or too long to read easily.",
-    "068": "if/elif chain without a final else branch to handle unexpected cases.",
+    "SC401": "Dead code: unused functions, unreachable branches, or commented-out blocks.",
+    "SC402": "Deep nesting obscures the happy path — use guard clauses instead.",
+    "SC403": "Imperative for-loop with .append() — use a list comprehension or pipeline.",
+    "SC404": "Complex boolean expression that is hard to parse mentally.",
+    "SC405": "Boolean flag variable controlling loop flow instead of break/continue.",
+    "SC406": "Comprehension is too nested or too long to read easily.",
+    "SC407": "if/elif chain without a final else branch to handle unexpected cases.",
     # Architecture
-    "051": "Error codes returned instead of raising exceptions — callers forget to check.",
-    "054": "Chained attribute access (Law of Demeter) couples you to the object graph.",
-    "CYC": "Circular import: two or more modules import each other.",
-    "GOD": "God module with too many top-level definitions trying to do everything.",
-    "SHO": "Shotgun surgery: changing this symbol requires edits across many modules.",
-    "INT": "Two classes share too many internals, indicating inappropriate intimacy.",
-    "SPG": "Abstract base class with no concrete implementations — speculative generality.",
-    "UDE": "A stable module depends on a more volatile one, inverting the dependency direction.",
+    "SC501": "Error codes returned instead of raising exceptions — callers forget to check.",
+    "SC502": "Chained attribute access (Law of Demeter) couples you to the object graph.",
+    "SC503": "Circular import: two or more modules import each other.",
+    "SC504": "God module with too many top-level definitions trying to do everything.",
+    "SC505": "Shotgun surgery: changing this symbol requires edits across many modules.",
+    "SC506": "Two classes share too many internals, indicating inappropriate intimacy.",
+    "SC507": "Abstract base class with no concrete implementations — speculative generality.",
+    "SC508": "A stable module depends on a more volatile one, inverting the dependency direction.",
     # Hygiene
-    "003": "Magic numbers or strings with no named constant to explain their meaning.",
-    "004": "Bare except clause swallows all exceptions including KeyboardInterrupt.",
-    "036": "String concatenation with + for multiline strings instead of f-strings or join.",
-    "063": "Manual try/finally context manager that contextlib would simplify.",
-    "065": "Exception handler with only 'pass' — silently swallowing errors.",
-    "013": "Same logic copy-pasted in multiple places — extract a shared function.",
+    "SC601": "Magic numbers or strings with no named constant to explain their meaning.",
+    "SC602": "Bare except clause swallows all exceptions including KeyboardInterrupt.",
+    "SC603": "String concatenation with + for multiline strings instead of f-strings or join.",
+    "SC604": "Manual try/finally context manager that contextlib would simplify.",
+    "SC605": "Exception handler with only 'pass' — silently swallowing errors.",
+    "SC606": "Same logic copy-pasted in multiple places — extract a shared function.",
     # Idioms
-    "057": "Mutable default argument (list/dict/set) is shared across all calls.",
-    "058": "Manual open/close resource cleanup instead of a 'with' context manager.",
-    "071": "Blocking I/O or sleep calls inside async functions freeze the event loop, preventing concurrent request handling.",
+    "SC701": "Mutable default argument (list/dict/set) is shared across all calls.",
+    "SC702": "Manual open/close resource cleanup instead of a 'with' context manager.",
+    "SC703": "Blocking I/O or sleep calls inside async functions freeze the event loop, preventing concurrent request handling.",
     # Metrics
-    "LCOM": "Class methods operate on disjoint attribute sets — low cohesion.",
-    "CBO":  "Class depends on too many other classes — high coupling.",
-    "FIO":  "Module or class calls too many distinct external classes — excessive fan-out.",
-    "RFC":  "Class response set is too large — too many callable methods.",
-    "MID":  "Class delegates almost everything to another object — middle man.",
+    "SC801": "Class methods operate on disjoint attribute sets — low cohesion.",
+    "SC802": "Class depends on too many other classes — high coupling.",
+    "SC803": "Module or class calls too many distinct external classes — excessive fan-out.",
+    "SC804": "Class response set is too large — too many callable methods.",
+    "SC805": "Class delegates almost everything to another object — middle man.",
 }
 # fmt: on
 
@@ -207,12 +201,11 @@ _RULE_DESCRIPTIONS: dict[str, str] = {
 class Finding:
     file: str
     line: int
-    pattern: str  # e.g. "#001"
+    pattern: str  # e.g. "SC701"
     name: str  # e.g. "Remove Setters"
     severity: str  # info | warning | error
     message: str
     category: str  # state | functions | types | control | architecture | hygiene | idioms | metrics
-    rule_id: str = ""  # e.g. "SC701" — unified SC code
     scope: str = ""  # file | cross_file | metric
 
     @property
@@ -382,7 +375,7 @@ def _generate_baseline_json(findings: list[Finding], base_path: Path) -> str:
             {
                 "fingerprint": _fingerprint(f, base_path),
                 "file": rel,
-                "pattern": f.rule_id or f.pattern,
+                "pattern": f.pattern,
                 "line": f.line,
                 "name": f.name,
             }
@@ -428,41 +421,23 @@ def _filter_baseline(
 
 
 # ---------------------------------------------------------------------------
-# Inline suppression (# noqa: SC001,SC057)
+# Inline suppression (# noqa: SC701,SC601)
 # ---------------------------------------------------------------------------
 
 _NOQA_RE = re.compile(r"#\s*noqa\b(?:\s*:\s*([A-Za-z0-9_,\s]+))?")
 
 
 def _resolve_code(code: str) -> set[str]:
-    """Map any code format to legacy pattern strings used in ``_RULE_REGISTRY``.
+    """Resolve a code to its SC rule key in ``_RULE_REGISTRY``.
 
-    Accepts: ``"SC701"``, ``"057"``, ``"#057"``, ``"CC"``, ``"SC057"`` (old prefix).
-    Returns a set of matching legacy patterns (e.g. ``{"#057"}``).
+    Accepts SC codes like ``"SC701"``.
+    Returns a set of matching registry keys (e.g. ``{"SC701"}``).
     """
     c = code.strip().upper()
     if not c:
         return set()
-    # New-style rule_id (e.g. SC701) or old SC-prefix with digits (e.g. SC057)
-    if c.startswith("SC") and len(c) > 2 and c[2:].isdigit():
-        # Try new rule_id first
-        pat = _RULE_ID_TO_LEGACY.get(c)
-        if pat:
-            return {pat}
-        # Fallback: old SC-prefix convention, e.g. SC057 -> #057
-        candidate = f"#{c[2:]}"
-        return {candidate} if candidate in _RULE_REGISTRY else set()
-    # Already a legacy pattern with #: "#057"
-    if c.startswith("#"):
-        return {c} if c in _RULE_REGISTRY else set()
-    # Bare ref: "057", "CC", "CYC", "LCOM"
-    candidate = f"#{c}"
-    if candidate in _RULE_REGISTRY:
-        return {candidate}
-    # Old SC-prefix with non-digit suffix: "SCCYC" -> "#CYC"
-    if c.startswith("SC"):
-        candidate = f"#{c[2:]}"
-        return {candidate} if candidate in _RULE_REGISTRY else set()
+    if c in _RULE_REGISTRY:
+        return {c}
     return set()
 
 
@@ -471,7 +446,6 @@ def _is_suppressed(source_lines: list[str], line: int, pattern: str) -> bool:
 
     ``# noqa`` alone suppresses everything.
     ``# noqa: SC701,SC601`` suppresses only the listed codes.
-    Both legacy (``SC057``) and new-style (``SC701``) codes are accepted.
     """
     if line < 1 or line > len(source_lines):
         return False
@@ -490,7 +464,7 @@ def _is_suppressed(source_lines: list[str], line: int, pattern: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Blocking calls in async functions (#071)
+# Blocking calls in async functions (SC703)
 # ---------------------------------------------------------------------------
 
 # Maps call key -> (display_name, async_alternative)
@@ -843,7 +817,6 @@ class SmellDetector(ast.NodeVisitor):
                 severity=severity,
                 message=message,
                 category=category,
-                rule_id=rd.rule_id if rd else "",
                 scope=rd.scope if rd else "file",
             )
         )
@@ -853,7 +826,7 @@ class SmellDetector(ast.NodeVisitor):
     # =======================================================================
 
     def _check_setters(self, node: ast.FunctionDef):
-        """#001 -- Remove Setters."""
+        """SC101 -- Remove Setters."""
         if (
             self._class_stack
             and node.name.startswith("set_")
@@ -862,7 +835,7 @@ class SmellDetector(ast.NodeVisitor):
             attr = node.name[4:]
             self._add(
                 node.lineno,
-                "#001",
+                "SC101",
                 "Remove Setters",
                 "warning",
                 f"Setter `{node.name}` -- consider making `{attr}` a constructor param or using @dataclass(frozen=True)",
@@ -870,7 +843,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_half_built_init(self, node: ast.FunctionDef):
-        """#016 -- Build With The Essence: __init__ setting attrs to None."""
+        """SC104 -- Build With The Essence: __init__ setting attrs to None."""
         if not (self._class_stack and node.name == "__init__"):
             return
         cls_name = self._class_stack[-1].name
@@ -895,7 +868,7 @@ class SmellDetector(ast.NodeVisitor):
                     self._class_attrs[cls_name].append(stmt.target.attr)
 
     def _check_bool_flag_attrs(self, node: ast.FunctionDef):
-        """#017 -- Convert Attributes to Sets: multiple is_* booleans."""
+        """SC105 -- Convert Attributes to Sets: multiple is_* booleans."""
         if not (self._class_stack and node.name == "__init__"):
             return
         cls_name = self._class_stack[-1].name
@@ -913,7 +886,7 @@ class SmellDetector(ast.NodeVisitor):
                         self._class_bool_attrs[cls_name].append(target.attr)
 
     def _check_public_attrs(self, node: ast.FunctionDef):
-        """#009 -- Protect Public Attributes."""
+        """SC103 -- Protect Public Attributes."""
         if not (self._class_stack and node.name == "__init__"):
             return
         public_attrs = []
@@ -930,7 +903,7 @@ class SmellDetector(ast.NodeVisitor):
         if len(public_attrs) >= 3:
             self._add(
                 node.lineno,
-                "#009",
+                "SC103",
                 "Protect Public Attributes",
                 "info",
                 f"Class `{self._class_stack[-1].name}` exposes {len(public_attrs)} public attrs: "
@@ -943,12 +916,12 @@ class SmellDetector(ast.NodeVisitor):
     # =======================================================================
 
     def _check_long_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#002 -- Extract Method: function too long."""
+        """SC201 -- Extract Method: function too long."""
         lines = _lines_of(node)
         if lines > MAX_FUNCTION_LINES:
             self._add(
                 node.lineno,
-                "#002",
+                "SC201",
                 "Extract Method",
                 "warning",
                 f"`{node.name}` is {lines} lines (threshold: {MAX_FUNCTION_LINES})",
@@ -956,12 +929,12 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_deep_nesting(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#039 -- Guard Clauses: deep nesting."""
+        """SC402 -- Guard Clauses: deep nesting."""
         depth = _nesting_depth(node)
         if depth > MAX_NESTING_DEPTH:
             self._add(
                 node.lineno,
-                "#039",
+                "SC402",
                 "Replace Nested Conditional with Guard Clauses",
                 "warning",
                 f"`{node.name}` has nesting depth {depth} (threshold: {MAX_NESTING_DEPTH})",
@@ -969,7 +942,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_too_many_params(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#034 -- Reify Parameters: long parameter list."""
+        """SC206 -- Reify Parameters: long parameter list."""
         args = node.args
         count = len(args.args) + len(args.posonlyargs) + len(args.kwonlyargs)
         if self._class_stack and args.args and args.args[0].arg in ("self", "cls"):
@@ -977,7 +950,7 @@ class SmellDetector(ast.NodeVisitor):
         if count > MAX_PARAMS:
             self._add(
                 node.lineno,
-                "#034",
+                "SC206",
                 "Reify Parameters",
                 "warning",
                 f"`{node.name}` has {count} parameters (threshold: {MAX_PARAMS})",
@@ -985,14 +958,14 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_generic_names(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#006 -- Rename Result Variables: generic names."""
+        """SC202 -- Rename Result Variables: generic names."""
         for child in ast.walk(node):
             if isinstance(child, ast.Assign):
                 for name in _get_assigned_names(child.targets):
                     if name in GENERIC_NAMES:
                         self._add(
                             child.lineno,
-                            "#006",
+                            "SC202",
                             "Rename Result Variables",
                             "info",
                             f"Generic variable name `{name}` in `{node.name}` -- use a descriptive name",
@@ -1000,7 +973,7 @@ class SmellDetector(ast.NodeVisitor):
                         )
 
     def _check_cqs_violation(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#041 -- Separate Query from Modifier (CQS)."""
+        """SC207 -- Separate Query from Modifier (CQS)."""
         if node.name.startswith("_") or not self._class_stack:
             return
         has_self_assignment = False
@@ -1023,7 +996,7 @@ class SmellDetector(ast.NodeVisitor):
         if has_self_assignment and has_return_value:
             self._add(
                 node.lineno,
-                "#041",
+                "SC207",
                 "Separate Query from Modifier",
                 "info",
                 f"`{node.name}` both mutates self and returns a value -- consider splitting",
@@ -1031,11 +1004,11 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_excessive_decorators(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#033 -- Strip Annotations: too many decorators."""
+        """SC205 -- Strip Annotations: too many decorators."""
         if len(node.decorator_list) > MAX_DECORATORS:
             self._add(
                 node.lineno,
-                "#033",
+                "SC205",
                 "Strip Annotations",
                 "info",
                 f"`{node.name}` has {len(node.decorator_list)} decorators (threshold: {MAX_DECORATORS})",
@@ -1043,7 +1016,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_unused_params(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#064 -- Remove Unused Parameters."""
+        """SC208 -- Remove Unused Parameters."""
         if _is_stub_body(node.body):
             return
         if _has_decorator(node, {"abstractmethod", "override", "overload"}):
@@ -1072,7 +1045,7 @@ class SmellDetector(ast.NodeVisitor):
         if unused:
             self._add(
                 node.lineno,
-                "#064",
+                "SC208",
                 "Remove Unused Parameters",
                 "warning",
                 f"`{node.name}` has unused parameters: {', '.join(sorted(unused))}",
@@ -1080,7 +1053,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_long_lambda(self, node: ast.Lambda):
-        """#066 -- Replace Long Lambda with Function."""
+        """SC209 -- Replace Long Lambda with Function."""
         try:
             source = ast.unparse(node)
         except Exception:
@@ -1088,7 +1061,7 @@ class SmellDetector(ast.NodeVisitor):
         if len(source) > MAX_LAMBDA_LENGTH:
             self._add(
                 node.lineno,
-                "#066",
+                "SC209",
                 "Replace Long Lambda with Function",
                 "info",
                 f"Lambda is {len(source)} chars (threshold: {MAX_LAMBDA_LENGTH}) -- use a named function",
@@ -1122,7 +1095,7 @@ class SmellDetector(ast.NodeVisitor):
         if isinstance_count >= 2:
             self._add(
                 node.lineno,
-                "#014",
+                "SC302",
                 "Replace IF with Polymorphism",
                 "warning",
                 f"isinstance chain with {isinstance_count} branches -- consider polymorphism or Protocol",
@@ -1130,7 +1103,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_lazy_class(self, node: ast.ClassDef):
-        """#069 -- Remove Lazy Class: class too small to justify existence."""
+        """SC306 -- Remove Lazy Class: class too small to justify existence."""
         # Skip special base classes
         for base in node.bases:
             if isinstance(base, ast.Name) and base.id in (
@@ -1178,7 +1151,7 @@ class SmellDetector(ast.NodeVisitor):
         ):
             self._add(
                 node.lineno,
-                "#069",
+                "SC306",
                 "Remove Lazy Class",
                 "info",
                 f"Class `{node.name}` has {non_dunder_count} non-dunder methods and {field_count} fields "
@@ -1187,7 +1160,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_temporary_fields(self, node: ast.ClassDef):
-        """#070 -- Remove Temporary Field: fields used in few methods."""
+        """SC307 -- Remove Temporary Field: fields used in few methods."""
         init_fields: set[str] = set()
         methods: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
         for stmt in node.body:
@@ -1224,7 +1197,7 @@ class SmellDetector(ast.NodeVisitor):
             if ratio < TEMP_FIELD_USAGE_RATIO:
                 self._add(
                     node.lineno,
-                    "#070",
+                    "SC307",
                     "Remove Temporary Field",
                     "info",
                     f"`{node.name}.{field_name}` used in {usage_count}/{len(methods)} methods "
@@ -1237,7 +1210,7 @@ class SmellDetector(ast.NodeVisitor):
     # =======================================================================
 
     def _check_loop_append(self, node: ast.For | ast.While):
-        """#040 -- Replace Loop with Pipeline."""
+        """SC403 -- Replace Loop with Pipeline."""
         for stmt in ast.walk(node):
             if (
                 isinstance(stmt, ast.Expr)
@@ -1247,7 +1220,7 @@ class SmellDetector(ast.NodeVisitor):
             ):
                 self._add(
                     node.lineno,
-                    "#040",
+                    "SC403",
                     "Replace Loop with Pipeline",
                     "info",
                     "Loop with `.append()` -- consider list comprehension or generator",
@@ -1256,7 +1229,7 @@ class SmellDetector(ast.NodeVisitor):
                 return
 
     def _check_control_flag(self, node: ast.For | ast.While):
-        """#055 -- Replace Control Flag with Break."""
+        """SC405 -- Replace Control Flag with Break."""
         parent_body = None
         if self._func_stack:
             parent_body = self._func_stack[-1].body
@@ -1285,7 +1258,7 @@ class SmellDetector(ast.NodeVisitor):
                 if isinstance(test, ast.Name) and test.id in flag_names:
                     self._add(
                         node.lineno,
-                        "#055",
+                        "SC405",
                         "Replace Control Flag with Break",
                         "info",
                         f"Boolean flag `{test.id}` controls loop -- use `break`/`return`/`any()`",
@@ -1299,7 +1272,7 @@ class SmellDetector(ast.NodeVisitor):
                     ):
                         self._add(
                             node.lineno,
-                            "#055",
+                            "SC405",
                             "Replace Control Flag with Break",
                             "info",
                             f"Boolean flag `{test.operand.id}` controls loop -- use `break`/`return`/`any()`",
@@ -1308,7 +1281,7 @@ class SmellDetector(ast.NodeVisitor):
                         return
 
     def _check_complex_boolean(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#042 -- Decompose Conditional."""
+        """SC404 -- Decompose Conditional."""
 
         def _count_bool_ops(expr: ast.AST) -> int:
             if isinstance(expr, ast.BoolOp):
@@ -1324,7 +1297,7 @@ class SmellDetector(ast.NodeVisitor):
                 if ops >= 3:
                     self._add(
                         child.lineno,
-                        "#042",
+                        "SC404",
                         "Decompose Conditional",
                         "warning",
                         f"Complex boolean ({ops} operators) in `{node.name}` -- extract to descriptive function",
@@ -1333,7 +1306,7 @@ class SmellDetector(ast.NodeVisitor):
                     return
 
     def _check_missing_else(self, node: ast.If):
-        """#068 -- Add Default Else Branch: if/elif chain without else."""
+        """SC407 -- Add Default Else Branch: if/elif chain without else."""
         # Only flag top-level if statements (not nested inside elif)
         has_elif = False
         current = node
@@ -1348,7 +1321,7 @@ class SmellDetector(ast.NodeVisitor):
         if has_elif and branch_count >= 2:
             self._add(
                 node.lineno,
-                "#068",
+                "SC407",
                 "Add Default Else Branch",
                 "info",
                 f"if/elif chain with {branch_count} branches but no default `else`",
@@ -1356,7 +1329,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_long_comprehension(self, node: ast.AST):
-        """#067 -- Simplify Complex Comprehension: too many nested generators."""
+        """SC406 -- Simplify Complex Comprehension: too many nested generators."""
         if isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
             if len(node.generators) > MAX_COMPREHENSION_GENERATORS:
                 kind = {
@@ -1366,7 +1339,7 @@ class SmellDetector(ast.NodeVisitor):
                 }.get(type(node), "Comprehension")
                 self._add(
                     node.lineno,
-                    "#067",
+                    "SC406",
                     "Simplify Complex Comprehension",
                     "info",
                     f"{kind} has {len(node.generators)} nested loops -- simplify or use explicit loops",
@@ -1376,7 +1349,7 @@ class SmellDetector(ast.NodeVisitor):
             if len(node.generators) > MAX_COMPREHENSION_GENERATORS:
                 self._add(
                     node.lineno,
-                    "#067",
+                    "SC406",
                     "Simplify Complex Comprehension",
                     "info",
                     f"Dict comprehension has {len(node.generators)} nested loops -- simplify",
@@ -1388,7 +1361,7 @@ class SmellDetector(ast.NodeVisitor):
     # =======================================================================
 
     def _check_singleton(self, node: ast.ClassDef):
-        """#018 -- Replace Singleton."""
+        """SC303 -- Replace Singleton."""
         for stmt in node.body:
             if isinstance(stmt, ast.Assign):
                 for t in stmt.targets:
@@ -1399,7 +1372,7 @@ class SmellDetector(ast.NodeVisitor):
                     ):
                         self._add(
                             node.lineno,
-                            "#018",
+                            "SC303",
                             "Replace Singleton",
                             "warning",
                             f"Class `{node.name}` uses Singleton pattern -- consider dependency injection",
@@ -1408,7 +1381,7 @@ class SmellDetector(ast.NodeVisitor):
                         return
 
     def _check_global_mutable(self, node: ast.Assign):
-        """#024 -- Replace Global Variables with DI."""
+        """SC106 -- Replace Global Variables with DI."""
         if self._class_stack or self._func_stack:
             return
         if isinstance(node.value, (ast.Call, ast.Dict, ast.List, ast.Set)):
@@ -1416,7 +1389,7 @@ class SmellDetector(ast.NodeVisitor):
                 if not name.startswith("_") and name != name.upper():
                     self._add(
                         node.lineno,
-                        "#024",
+                        "SC106",
                         "Replace Global Variables with DI",
                         "info",
                         f"Module-level mutable `{name}` -- consider dependency injection",
@@ -1424,7 +1397,7 @@ class SmellDetector(ast.NodeVisitor):
                     )
 
     def _check_constant_without_final(self, node: ast.Assign):
-        """#008 -- Convert Variables to Constants."""
+        """SC102 -- Convert Variables to Constants."""
         if self._class_stack or self._func_stack:
             return
         for name in _get_assigned_names(node.targets):
@@ -1433,7 +1406,7 @@ class SmellDetector(ast.NodeVisitor):
             ):
                 self._add(
                     node.lineno,
-                    "#008",
+                    "SC102",
                     "Convert Variables to Constants",
                     "info",
                     f"`{name}` is UPPER_CASE but not annotated with `typing.Final`",
@@ -1441,7 +1414,7 @@ class SmellDetector(ast.NodeVisitor):
                 )
 
     def _check_sequential_ids(self, node: ast.ClassDef):
-        """#028 -- Replace Sequential IDs."""
+        """SC107 -- Replace Sequential IDs."""
         for stmt in node.body:
             if isinstance(stmt, ast.Assign):
                 for t in stmt.targets:
@@ -1452,7 +1425,7 @@ class SmellDetector(ast.NodeVisitor):
                     ):
                         self._add(
                             node.lineno,
-                            "#028",
+                            "SC107",
                             "Replace Sequential IDs",
                             "info",
                             f"Class `{node.name}` uses sequential ID pattern (`{t.id}`) -- consider UUID",
@@ -1461,7 +1434,7 @@ class SmellDetector(ast.NodeVisitor):
                         return
 
     def _check_error_codes(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#051 -- Replace Error Codes with Exceptions."""
+        """SC501 -- Replace Error Codes with Exceptions."""
         return_ints: set[int] = set()
         total_returns = 0
         for child in ast.walk(node):
@@ -1484,7 +1457,7 @@ class SmellDetector(ast.NodeVisitor):
             if return_ints.issubset({-1, 0, 1, -2, 2}):
                 self._add(
                     node.lineno,
-                    "#051",
+                    "SC501",
                     "Replace Error Codes with Exceptions",
                     "warning",
                     f"`{node.name}` returns status codes {sorted(return_ints)} -- use exceptions",
@@ -1492,7 +1465,7 @@ class SmellDetector(ast.NodeVisitor):
                 )
 
     def _check_law_of_demeter(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#054 -- Law of Demeter: chained .attr.attr.attr access."""
+        """SC502 -- Law of Demeter: chained .attr.attr.attr access."""
         for child in ast.walk(node):
             if isinstance(child, ast.Attribute):
                 depth = 1
@@ -1515,7 +1488,7 @@ class SmellDetector(ast.NodeVisitor):
                     chain = ".".join(reversed(parts))
                     self._add(
                         child.lineno,
-                        "#054",
+                        "SC502",
                         "Law of Demeter",
                         "info",
                         f"Chain `{chain}` ({depth + 1} deep) in `{node.name}` -- introduce a delegate",
@@ -1528,7 +1501,7 @@ class SmellDetector(ast.NodeVisitor):
     # =======================================================================
 
     def _check_bare_except(self, node: ast.ExceptHandler):
-        """#004 -- Remove Unhandled Exceptions."""
+        """SC602 -- Remove Unhandled Exceptions."""
         is_bare = node.type is None
         is_broad = isinstance(node.type, ast.Name) and node.type.id == "Exception"
         body_is_pass = len(node.body) == 1 and isinstance(node.body[0], ast.Pass)
@@ -1536,7 +1509,7 @@ class SmellDetector(ast.NodeVisitor):
         if is_bare:
             self._add(
                 node.lineno,
-                "#004",
+                "SC602",
                 "Remove Unhandled Exceptions",
                 "error",
                 "Bare `except:` -- always catch specific exceptions",
@@ -1545,7 +1518,7 @@ class SmellDetector(ast.NodeVisitor):
         elif is_broad and body_is_pass:
             self._add(
                 node.lineno,
-                "#004",
+                "SC602",
                 "Remove Unhandled Exceptions",
                 "warning",
                 "`except Exception: pass` -- silently swallowing all errors",
@@ -1553,7 +1526,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_empty_catch(self, node: ast.ExceptHandler):
-        """#065 -- Remove Empty Catch Block: except SomeError: pass."""
+        """SC605 -- Remove Empty Catch Block: except SomeError: pass."""
         # Skip cases already handled by #004 (bare except, except Exception: pass)
         if node.type is None:
             return
@@ -1570,7 +1543,7 @@ class SmellDetector(ast.NodeVisitor):
                 exc_name = ast.dump(node.type)
             self._add(
                 node.lineno,
-                "#065",
+                "SC605",
                 "Remove Empty Catch Block",
                 "warning",
                 f"`except {exc_name}: pass` -- silently swallowing `{exc_name}`",
@@ -1578,7 +1551,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_magic_numbers(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#003 -- Extract Constant: magic numbers."""
+        """SC601 -- Extract Constant: magic numbers."""
         return_lines = set()
         default_nodes: set[int] = set()
         for d in node.args.defaults + node.args.kw_defaults:
@@ -1604,7 +1577,7 @@ class SmellDetector(ast.NodeVisitor):
                     continue
                 self._add(
                     child.lineno,
-                    "#003",
+                    "SC601",
                     "Extract Constant",
                     "info",
                     f"Magic number `{child.value}` -- extract to a named constant",
@@ -1612,7 +1585,7 @@ class SmellDetector(ast.NodeVisitor):
                 )
 
     def _check_string_concat(self, node: ast.BinOp):
-        """#036 -- Replace String Concatenation."""
+        """SC603 -- Replace String Concatenation."""
         if not isinstance(node.op, ast.Add):
             return
         if node.lineno in self._string_concat_lines:
@@ -1626,7 +1599,7 @@ class SmellDetector(ast.NodeVisitor):
             self._string_concat_lines.add(node.lineno)
             self._add(
                 node.lineno,
-                "#036",
+                "SC603",
                 "Replace String Concatenation",
                 "info",
                 "Multiple string concatenations -- consider f-string or triple-quoted string",
@@ -1638,12 +1611,12 @@ class SmellDetector(ast.NodeVisitor):
     # =======================================================================
 
     def _check_mutable_default(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#057 -- Replace Mutable Default Arguments."""
+        """SC701 -- Replace Mutable Default Arguments."""
         for default in node.args.defaults + node.args.kw_defaults:
             if default is not None and _is_mutable_literal(default):
                 self._add(
                     node.lineno,
-                    "#057",
+                    "SC701",
                     "Replace Mutable Default Arguments",
                     "error",
                     f"`{node.name}` has mutable default argument -- use `None` sentinel",
@@ -1651,12 +1624,12 @@ class SmellDetector(ast.NodeVisitor):
                 )
 
     def _check_open_without_with(self, node: ast.Call):
-        """#058 -- Use Context Managers."""
+        """SC702 -- Use Context Managers."""
         if isinstance(node.func, ast.Name) and node.func.id == "open":
             self._open_calls_outside_with.append((node.lineno, "open"))
 
     def _check_blocking_in_async(self, node: ast.AsyncFunctionDef):
-        """#071 -- Avoid Blocking Calls in Async Functions."""
+        """SC703 -- Avoid Blocking Calls in Async Functions."""
         for child in _walk_skip_nested_scopes(node):
             if not isinstance(child, ast.Call):
                 continue
@@ -1668,7 +1641,7 @@ class SmellDetector(ast.NodeVisitor):
                 display, alt = _BLOCKING_CALLS[key]
                 self._add(
                     child.lineno,
-                    "#071",
+                    "SC703",
                     "Avoid Blocking Calls in Async Functions",
                     "warning",
                     f"`{display}` blocks the event loop in async function `{node.name}` -- use {alt}",
@@ -1716,7 +1689,7 @@ class SmellDetector(ast.NodeVisitor):
         if cc > MAX_CYCLOMATIC_COMPLEXITY:
             self._add(
                 node.lineno,
-                "#CC",
+                "SC210",
                 "Reduce Cyclomatic Complexity",
                 "warning",
                 f"`{node.name}` has CC={cc} (threshold: {MAX_CYCLOMATIC_COMPLEXITY}) -- split into smaller functions",
@@ -1724,7 +1697,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_index_access(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#062 -- Use Unpacking Instead of Indexing."""
+        """SC305 -- Use Unpacking Instead of Indexing."""
         index_accesses: dict[str, list[int]] = defaultdict(list)
         for child in ast.walk(node):
             if (
@@ -1739,7 +1712,7 @@ class SmellDetector(ast.NodeVisitor):
             if len(unique) >= 3 and unique[:3] == [0, 1, 2]:
                 self._add(
                     node.lineno,
-                    "#062",
+                    "SC305",
                     "Use Unpacking Instead of Indexing",
                     "info",
                     f"`{var_name}[0]`, `{var_name}[1]`, `{var_name}[2]`... in `{node.name}` -- use unpacking",
@@ -1747,7 +1720,7 @@ class SmellDetector(ast.NodeVisitor):
                 )
 
     def _check_return_none_or_value(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#029 -- Replace NULL with Collection."""
+        """SC204 -- Replace NULL with Collection."""
         returns_none = False
         returns_value = False
         for child in ast.walk(node):
@@ -1769,7 +1742,7 @@ class SmellDetector(ast.NodeVisitor):
                 ):
                     self._add(
                         node.lineno,
-                        "#029",
+                        "SC204",
                         "Replace NULL with Collection",
                         "info",
                         f"`{node.name}` returns both None and a list -- always return empty list",
@@ -1780,7 +1753,7 @@ class SmellDetector(ast.NodeVisitor):
     def _check_dead_code_after_return(
         self, node: ast.FunctionDef | ast.AsyncFunctionDef
     ):
-        """#021 -- Remove Dead Code."""
+        """SC401 -- Remove Dead Code."""
         terminal = (ast.Return, ast.Raise, ast.Break, ast.Continue)
 
         def _check_body(body: list[ast.stmt]):
@@ -1789,7 +1762,7 @@ class SmellDetector(ast.NodeVisitor):
                     next_stmt = body[i + 1]
                     self._add(
                         next_stmt.lineno,
-                        "#021",
+                        "SC401",
                         "Remove Dead Code",
                         "warning",
                         f"Unreachable code after `{type(stmt).__name__.lower()}` in `{node.name}`",
@@ -1810,7 +1783,7 @@ class SmellDetector(ast.NodeVisitor):
         _check_body(node.body)
 
     def _check_input_in_logic(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
-        """#026 -- Replace input() Calls."""
+        """SC203 -- Replace input() Calls."""
         if node.name in ("main", "__main__", "cli", "repl", "prompt", "interactive"):
             return
         for child in ast.walk(node):
@@ -1821,7 +1794,7 @@ class SmellDetector(ast.NodeVisitor):
             ):
                 self._add(
                     child.lineno,
-                    "#026",
+                    "SC203",
                     "Replace input() Calls",
                     "warning",
                     f"`input()` in `{node.name}` -- inject data via parameters",
@@ -1830,7 +1803,7 @@ class SmellDetector(ast.NodeVisitor):
                 return
 
     def _check_dataclass_candidate(self, node: ast.ClassDef):
-        """#061 -- Replace Class with Dataclass."""
+        """SC304 -- Replace Class with Dataclass."""
         method_names = set()
         for stmt in node.body:
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -1847,7 +1820,7 @@ class SmellDetector(ast.NodeVisitor):
         if len(boilerplate) >= 2:
             self._add(
                 node.lineno,
-                "#061",
+                "SC304",
                 "Replace Class with Dataclass",
                 "info",
                 f"Class `{node.name}` implements {', '.join(sorted(boilerplate))} -- consider @dataclass",
@@ -1855,7 +1828,7 @@ class SmellDetector(ast.NodeVisitor):
             )
 
     def _check_context_manager_class(self, node: ast.ClassDef):
-        """#063 -- Replace with contextlib."""
+        """SC604 -- Replace with contextlib."""
         method_names = set()
         for stmt in node.body:
             if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -1867,7 +1840,7 @@ class SmellDetector(ast.NodeVisitor):
             if len(real_methods) <= 2:
                 self._add(
                     node.lineno,
-                    "#063",
+                    "SC604",
                     "Replace with contextlib",
                     "info",
                     f"Class `{node.name}` implements __enter__/__exit__ -- consider @contextmanager",
@@ -2057,7 +2030,7 @@ class SmellDetector(ast.NodeVisitor):
         if len(none_attrs) >= 2:
             self._add(
                 node.lineno,
-                "#016",
+                "SC104",
                 "Build With The Essence",
                 "warning",
                 f"`{cls_name}.__init__` sets {len(none_attrs)} attrs to None: "
@@ -2069,7 +2042,7 @@ class SmellDetector(ast.NodeVisitor):
         if len(bool_attrs) >= 3:
             self._add(
                 node.lineno,
-                "#017",
+                "SC105",
                 "Convert Attributes to Sets",
                 "info",
                 f"`{cls_name}` has {len(bool_attrs)} boolean flags: "
@@ -2081,7 +2054,7 @@ class SmellDetector(ast.NodeVisitor):
         if method_count > MAX_CLASS_METHODS:
             self._add(
                 node.lineno,
-                "#007",
+                "SC301",
                 "Extract Class",
                 "info",
                 f"`{cls_name}` has {method_count} methods -- consider splitting",
@@ -2239,7 +2212,7 @@ class SmellDetector(ast.NodeVisitor):
         for line, name in self._open_calls_outside_with:
             self._add(
                 line,
-                "#058",
+                "SC702",
                 "Use Context Managers",
                 "warning",
                 f"`{name}()` call without `with` statement -- use context manager",
@@ -2294,7 +2267,6 @@ def _make_finding(
         severity=severity,
         message=message,
         category=category,
-        rule_id=rd.rule_id if rd else "",
         scope=rd.scope if rd else "cross_file",
     )
 
@@ -2305,7 +2277,7 @@ def _make_finding(
 
 
 def _detect_duplicate_functions(all_data: list[FileData]) -> list[Finding]:
-    """#013 -- Structurally identical functions via AST-normalized hashing."""
+    """SC606 -- Structurally identical functions via AST-normalized hashing."""
     hash_groups: dict[str, list[tuple[str, str, int, int]]] = defaultdict(list)
     for fd in all_data:
         for filepath, func_name, line, sig_hash, line_count in fd.func_signatures:
@@ -2323,7 +2295,7 @@ def _detect_duplicate_functions(all_data: list[FileData]) -> list[Finding]:
             _make_finding(
                 file=first_file,
                 line=first_line,
-                pattern="#013",
+                pattern="SC606",
                 name="Remove Duplicated Code",
                 severity="warning",
                 message=f"`{first_name}` has structurally identical copies: {', '.join(others)}",
@@ -2334,7 +2306,7 @@ def _detect_duplicate_functions(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_cyclic_imports(all_data: list[FileData]) -> list[Finding]:
-    """#CYC -- Circular imports via DFS on intra-project import graph."""
+    """SC503 -- Circular imports via DFS on intra-project import graph."""
     module_map = {fd.filepath: Path(fd.filepath).stem for fd in all_data}
     reverse_map: dict[str, str] = {v: k for k, v in module_map.items()}
     import_graph: dict[str, set[str]] = defaultdict(set)
@@ -2378,7 +2350,7 @@ def _detect_cyclic_imports(all_data: list[FileData]) -> list[Finding]:
             _make_finding(
                 file=reverse_map.get(a, a),
                 line=1,
-                pattern="#CYC",
+                pattern="SC503",
                 name="Break Cyclic Import",
                 severity="warning",
                 message=f"Circular import: `{a}` <-> `{b}` -- extract shared types to break cycle",
@@ -2389,12 +2361,12 @@ def _detect_cyclic_imports(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_god_modules(all_data: list[FileData]) -> list[Finding]:
-    """#GOD -- Modules with too many top-level definitions."""
+    """SC504 -- Modules with too many top-level definitions."""
     return [
         _make_finding(
             file=fd.filepath,
             line=1,
-            pattern="#GOD",
+            pattern="SC504",
             name="Split God Module",
             severity="warning",
             message=f"Module has {fd.toplevel_defs} top-level definitions "
@@ -2407,7 +2379,7 @@ def _detect_god_modules(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_feature_envy(all_data: list[FileData]) -> list[Finding]:
-    """#FE -- Methods that access external class more than their own."""
+    """SC211 -- Methods that access external class more than their own."""
     project_classes: set[str] = set()
     for fd in all_data:
         project_classes.update(fd.class_names)
@@ -2427,7 +2399,7 @@ def _detect_feature_envy(all_data: list[FileData]) -> list[Finding]:
                     _make_finding(
                         file=fd.filepath,
                         line=line,
-                        pattern="#FE",
+                        pattern="SC211",
                         name="Move Method (Feature Envy)",
                         severity="info",
                         message=f"`{host_class}.{method_name}` accesses `{ext_class}` "
@@ -2444,7 +2416,7 @@ def _detect_feature_envy(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_shotgun_surgery(all_data: list[FileData]) -> list[Finding]:
-    """#SHO -- Function called from too many different files."""
+    """SC505 -- Function called from too many different files."""
     defined_in: dict[str, list[str]] = defaultdict(list)
     called_from: dict[str, set[str]] = defaultdict(set)
 
@@ -2482,7 +2454,7 @@ def _detect_shotgun_surgery(all_data: list[FileData]) -> list[Finding]:
                 _make_finding(
                     file=def_file,
                     line=1,
-                    pattern="#SHO",
+                    pattern="SC505",
                     name="Shotgun Surgery",
                     severity="info",
                     message=f"`{func_name}` is called from {len(external_callers)} different files "
@@ -2494,7 +2466,7 @@ def _detect_shotgun_surgery(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_deep_inheritance(all_data: list[FileData]) -> list[Finding]:
-    """#DIT -- Deep inheritance tree."""
+    """SC308 -- Deep inheritance tree."""
     all_bases: dict[str, list[str]] = {}
     all_locations: dict[str, tuple[str, int]] = {}
     for fd in all_data:
@@ -2524,7 +2496,7 @@ def _detect_deep_inheritance(all_data: list[FileData]) -> list[Finding]:
                 _make_finding(
                     file=filepath,
                     line=line,
-                    pattern="#DIT",
+                    pattern="SC308",
                     name="Deep Inheritance Tree",
                     severity="warning",
                     message=f"Class `{cls_name}` has inheritance depth {d} "
@@ -2536,7 +2508,7 @@ def _detect_deep_inheritance(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_wide_hierarchy(all_data: list[FileData]) -> list[Finding]:
-    """#WHI -- Too many direct subclasses."""
+    """SC309 -- Too many direct subclasses."""
     children: dict[str, list[str]] = defaultdict(list)
     all_locations: dict[str, tuple[str, int]] = {}
     for fd in all_data:
@@ -2555,7 +2527,7 @@ def _detect_wide_hierarchy(all_data: list[FileData]) -> list[Finding]:
                 _make_finding(
                     file=filepath,
                     line=line,
-                    pattern="#WHI",
+                    pattern="SC309",
                     name="Wide Hierarchy",
                     severity="info",
                     message=f"Class `{parent}` has {len(subs)} direct subclasses: "
@@ -2567,7 +2539,7 @@ def _detect_wide_hierarchy(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_inappropriate_intimacy(all_data: list[FileData]) -> list[Finding]:
-    """#INT -- Classes that share too many attribute accesses."""
+    """SC506 -- Classes that share too many attribute accesses."""
     intimacy: Counter[frozenset[str]] = Counter()
     class_files: dict[str, tuple[str, int]] = {}
     for fd in all_data:
@@ -2588,7 +2560,7 @@ def _detect_inappropriate_intimacy(all_data: list[FileData]) -> list[Finding]:
                     _make_finding(
                         file=filepath,
                         line=line,
-                        pattern="#INT",
+                        pattern="SC506",
                         name="Inappropriate Intimacy",
                         severity="info",
                         message=f"Classes `{a}` and `{b}` share {count} attribute accesses -- decouple or merge",
@@ -2599,7 +2571,7 @@ def _detect_inappropriate_intimacy(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_speculative_generality(all_data: list[FileData]) -> list[Finding]:
-    """#SPG -- Abstract classes with no concrete implementations."""
+    """SC507 -- Abstract classes with no concrete implementations."""
     all_bases_flat: dict[str, list[str]] = {}
     abstract_classes: set[str] = set()
     for fd in all_data:
@@ -2623,7 +2595,7 @@ def _detect_speculative_generality(all_data: list[FileData]) -> list[Finding]:
                         _make_finding(
                             file=fd.filepath,
                             line=fd.class_lines.get(abc_cls, 1),
-                            pattern="#SPG",
+                            pattern="SC507",
                             name="Remove Speculative Generality",
                             severity="info",
                             message=f"Abstract class `{abc_cls}` has no concrete implementations -- YAGNI?",
@@ -2635,7 +2607,7 @@ def _detect_speculative_generality(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_unstable_dependency(all_data: list[FileData]) -> list[Finding]:
-    """#UDE -- Module depends on a more unstable module (Robert Martin's I metric)."""
+    """SC508 -- Module depends on a more unstable module (Robert Martin's I metric)."""
     module_map = {fd.filepath: Path(fd.filepath).stem for fd in all_data}
     reverse_map: dict[str, str] = {v: k for k, v in module_map.items()}
 
@@ -2666,7 +2638,7 @@ def _detect_unstable_dependency(all_data: list[FileData]) -> list[Finding]:
                     _make_finding(
                         file=filepath,
                         line=1,
-                        pattern="#UDE",
+                        pattern="SC508",
                         name="Unstable Dependency",
                         severity="info",
                         message=f"Module `{module}` (I={my_i:.2f}) depends on unstable `{dep}` (I={dep_i:.2f})",
@@ -2682,7 +2654,7 @@ def _detect_unstable_dependency(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_low_cohesion(all_data: list[FileData]) -> list[Finding]:
-    """#LCOM -- Lack of Cohesion of Methods."""
+    """SC801 -- Lack of Cohesion of Methods."""
     findings: list[Finding] = []
     for fd in all_data:
         for ci in fd.class_info:
@@ -2709,7 +2681,7 @@ def _detect_low_cohesion(all_data: list[FileData]) -> list[Finding]:
                     _make_finding(
                         file=ci.filepath,
                         line=ci.line,
-                        pattern="#LCOM",
+                        pattern="SC801",
                         name="Low Class Cohesion",
                         severity="warning",
                         message=f"Class `{ci.name}` has LCOM={lcom:.2f} "
@@ -2721,7 +2693,7 @@ def _detect_low_cohesion(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_high_coupling(all_data: list[FileData]) -> list[Finding]:
-    """#CBO -- Coupling Between Objects."""
+    """SC802 -- Coupling Between Objects."""
     findings: list[Finding] = []
     for fd in all_data:
         for ci in fd.class_info:
@@ -2731,7 +2703,7 @@ def _detect_high_coupling(all_data: list[FileData]) -> list[Finding]:
                     _make_finding(
                         file=ci.filepath,
                         line=ci.line,
-                        pattern="#CBO",
+                        pattern="SC802",
                         name="High Coupling Between Objects",
                         severity="warning",
                         message=f"Class `{ci.name}` is coupled to {coupled_classes} other classes "
@@ -2743,7 +2715,7 @@ def _detect_high_coupling(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_fan_out(all_data: list[FileData]) -> list[Finding]:
-    """#FIO -- Excessive module fan-out (outgoing dependencies)."""
+    """SC803 -- Excessive module fan-out (outgoing dependencies)."""
     module_map = {fd.filepath: Path(fd.filepath).stem for fd in all_data}
     reverse_map: dict[str, str] = {v: k for k, v in module_map.items()}
 
@@ -2756,7 +2728,7 @@ def _detect_fan_out(all_data: list[FileData]) -> list[Finding]:
                 _make_finding(
                     file=fd.filepath,
                     line=1,
-                    pattern="#FIO",
+                    pattern="SC803",
                     name="Excessive Fan-Out",
                     severity="info",
                     message=f"Module `{src}` has {len(outgoing)} outgoing dependencies "
@@ -2768,7 +2740,7 @@ def _detect_fan_out(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_high_rfc(all_data: list[FileData]) -> list[Finding]:
-    """#RFC -- Response for a Class (own methods + directly called external methods)."""
+    """SC804 -- Response for a Class (own methods + directly called external methods)."""
     findings: list[Finding] = []
     for fd in all_data:
         for ci in fd.class_info:
@@ -2780,7 +2752,7 @@ def _detect_high_rfc(all_data: list[FileData]) -> list[Finding]:
                     _make_finding(
                         file=ci.filepath,
                         line=ci.line,
-                        pattern="#RFC",
+                        pattern="SC804",
                         name="High Response for Class",
                         severity="info",
                         message=f"Class `{ci.name}` has RFC={rfc} "
@@ -2793,7 +2765,7 @@ def _detect_high_rfc(all_data: list[FileData]) -> list[Finding]:
 
 
 def _detect_middle_man(all_data: list[FileData]) -> list[Finding]:
-    """#MID -- Class where most methods just delegate to another object."""
+    """SC805 -- Class where most methods just delegate to another object."""
     findings: list[Finding] = []
     for fd in all_data:
         for ci in fd.class_info:
@@ -2805,7 +2777,7 @@ def _detect_middle_man(all_data: list[FileData]) -> list[Finding]:
                     _make_finding(
                         file=ci.filepath,
                         line=ci.line,
-                        pattern="#MID",
+                        pattern="SC805",
                         name="Remove Middle Man",
                         severity="info",
                         message=f"Class `{ci.name}` delegates {ci.delegation_count}/{ci.non_dunder_method_count} "
@@ -3055,17 +3027,15 @@ def _print_summary(filtered: list[Finding]):
         for f in sorted(file_findings, key=lambda x: x.line):
             color = SEVERITY_COLORS.get(f.severity, "")
             sev = f.severity.upper()[:4]
-            code = f.rule_id or f.pattern
-            print(f"  {color}{sev}{RESET} L{f.line:<5} {code} {f.name}")
+            print(f"  {color}{sev}{RESET} L{f.line:<5} {f.pattern} {f.name}")
             print(f"         {f.message}")
         print()
 
     print(f"{BOLD}Top patterns:{RESET}")
     for pattern, count in pattern_counts.most_common(10):
         matching = next((f for f in filtered if f.pattern == pattern), None)
-        code = matching.rule_id or pattern if matching else pattern
         name = matching.name if matching else ""
-        print(f"  {code} {name}: {count}")
+        print(f"  {pattern} {name}: {count}")
     print()
 
 
@@ -3074,8 +3044,7 @@ def _print_github_annotations(filtered: list[Finding]):
     _GH_SEV = {"error": "error", "warning": "warning", "info": "notice"}
     for f in filtered:
         sev = _GH_SEV.get(f.severity, "notice")
-        code = f.rule_id or f.pattern
-        title = f"{code} {f.name}"
+        title = f"{f.pattern} {f.name}"
         print(f"::{sev} file={f.file},line={f.line},title={title}::{f.message}")
 
 
@@ -3089,7 +3058,7 @@ _SARIF_REF_BASE = (
 
 def _sarif_rule(rd: RuleDef) -> dict:
     """Build a SARIF reportingDescriptor (rule) from a RuleDef."""
-    desc = _RULE_DESCRIPTIONS.get(rd.pattern_ref, rd.name)
+    desc = _RULE_DESCRIPTIONS.get(rd.rule_id, rd.name)
     help_uri = f"{_SARIF_REF_BASE}/{rd.family}.md"
     help_md = (
         f"## {rd.name} ({rd.rule_id})\n\n"
@@ -3112,22 +3081,20 @@ def _sarif_rule(rd: RuleDef) -> dict:
         "properties": {
             "family": rd.family,
             "scope": rd.scope,
-            "patternRef": rd.pattern_ref,
         },
     }
 
 
 def _sarif_result(f: Finding, rule_index: dict[str, int]) -> dict:
     """Build a SARIF result from a Finding."""
-    rule_id = f.rule_id or f.pattern
     try:
         rel = Path(f.file).resolve().relative_to(Path.cwd().resolve()).as_posix()
     except ValueError:
         rel = Path(f.file).name
-    fp_raw = f"{rule_id}\0{rel}\0{_normalize_message(f.message)}"
+    fp_raw = f"{f.pattern}\0{rel}\0{_normalize_message(f.message)}"
     fp_hash = hashlib.sha256(fp_raw.encode()).hexdigest()
     result: dict = {
-        "ruleId": rule_id,
+        "ruleId": f.pattern,
         "level": _SARIF_LEVEL.get(f.severity, "note"),
         "message": {"text": f.message},
         "locations": [
@@ -3140,8 +3107,8 @@ def _sarif_result(f: Finding, rule_index: dict[str, int]) -> dict:
         ],
         "partialFingerprints": {"primaryLocationLineHash": fp_hash},
     }
-    if rule_id in rule_index:
-        result["ruleIndex"] = rule_index[rule_id]
+    if f.pattern in rule_index:
+        result["ruleIndex"] = rule_index[f.pattern]
     return result
 
 
@@ -3155,7 +3122,7 @@ def _format_sarif(filtered: list[Finding]) -> str:
         if f.pattern not in seen_rules:
             rd = _RULE_REGISTRY.get(f.pattern)
             if rd:
-                seen_rules[rd.rule_id] = rd
+                seen_rules[f.pattern] = rd
 
     rules = []
     rule_index: dict[str, int] = {}
@@ -3237,8 +3204,8 @@ _HELP_TEXT: Final = textwrap.dedent("""\
                           (default: error)
       --min-severity SEV  Only display findings >= SEV: info | warning | error
                           (default: info)
-      --select CODES      Only run these checks (comma-separated, e.g. SC701,057,CC)
-      --ignore CODES      Skip these checks (comma-separated, e.g. SC601,006)
+      --select CODES      Only run these checks (comma-separated, e.g. SC701,SC601)
+      --ignore CODES      Skip these checks (comma-separated, e.g. SC601,SC202)
       --scope SCOPE       Only show findings of this scope: file | cross_file | metric
       --generate-baseline Output a JSON baseline of current findings to stdout
       --baseline PATH     Compare against baseline; only report new findings
@@ -3246,12 +3213,11 @@ _HELP_TEXT: Final = textwrap.dedent("""\
       -h, --help          Show this help
 
     Rule codes:
-      Each rule has a unified SC code (e.g. SC701) and a legacy pattern ref (e.g. 057).
-      Both formats are accepted in --select, --ignore, and # noqa comments.
+      Each rule has an SC code (e.g. SC701). SC codes are used in --select,
+      --ignore, and # noqa comments.
 
     Inline suppression:
       Add ``# noqa: SC701`` to suppress SC701 (mutable default args) on that line.
-      Legacy ``# noqa: SC057`` still works for backward compatibility.
       Use ``# noqa`` (no codes) to suppress all findings on that line.
 
     Configuration:

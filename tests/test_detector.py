@@ -74,7 +74,7 @@ def test_mutable_default_detected(tmp_path):
     )
     findings = scan_path(p)
     patterns = [f.pattern for f in findings]
-    assert "#057" in patterns
+    assert "SC701" in patterns
 
 
 def test_scan_directory(tmp_path):
@@ -90,7 +90,7 @@ def test_multiple_paths(tmp_path):
     p2 = _write_py(tmp_path, "def bar(y={}): pass\n", name="b.py")
     findings = scan_paths([p1, p2])
     patterns = [f.pattern for f in findings]
-    assert patterns.count("#057") >= 2
+    assert patterns.count("SC701") >= 2
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ def test_json_output_format(tmp_path, capsys):
     out = capsys.readouterr().out
     data = json.loads(out)
     assert isinstance(data, list)
-    assert any(d["pattern"] == "#057" for d in data)
+    assert any(d["pattern"] == "SC701" for d in data)
 
 
 def test_github_output_format(tmp_path, capsys):
@@ -286,10 +286,10 @@ def test_cli_format_sarif(tmp_path):
 
 
 def test_noqa_suppression(tmp_path):
-    p = _write_py(tmp_path, "def foo(x=[]):  # noqa: SC057\n    pass\n")
+    p = _write_py(tmp_path, "def foo(x=[]):  # noqa: SC701\n    pass\n")
     findings = scan_paths([p])
     patterns = [f.pattern for f in findings]
-    assert "#057" not in patterns
+    assert "SC701" not in patterns
 
 
 def test_noqa_all(tmp_path):
@@ -308,21 +308,20 @@ def test_noqa_all(tmp_path):
 def test_config_ignore(tmp_path):
     _write_py(tmp_path, "def foo(x=[]): pass\n")
     pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text('[tool.smellcheck]\nignore = ["057"]\n', encoding="utf-8")
+    pyproject.write_text('[tool.smellcheck]\nignore = ["SC701"]\n', encoding="utf-8")
     config = load_config(tmp_path)
     findings = scan_paths([tmp_path], config=config)
     patterns = [f.pattern for f in findings]
-    assert "#057" not in patterns
+    assert "SC701" not in patterns
 
 
 def test_config_select(tmp_path):
     _write_py(tmp_path, "def foo(x=[]): pass\n")
     pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text('[tool.smellcheck]\nselect = ["057"]\n', encoding="utf-8")
+    pyproject.write_text('[tool.smellcheck]\nselect = ["SC701"]\n', encoding="utf-8")
     config = load_config(tmp_path)
     findings = scan_paths([tmp_path], config=config)
-    # Only #057 findings should remain
-    assert all(f.pattern == "#057" for f in findings)
+    assert all(f.pattern == "SC701" for f in findings)
     assert len(findings) >= 1
 
 
@@ -371,68 +370,66 @@ def test_cli_help():
 def test_rule_registry_complete():
     """Registry has 56 entries with valid families and scopes."""
     assert len(_RULE_REGISTRY) == 56
-    for pat, rd in _RULE_REGISTRY.items():
-        assert pat.startswith("#"), f"Pattern {pat!r} must start with '#'"
-        assert rd.rule_id.startswith("SC"), (
-            f"rule_id {rd.rule_id!r} must start with 'SC'"
-        )
-        assert rd.family in _VALID_FAMILIES, f"Invalid family {rd.family!r} for {pat}"
-        assert rd.scope in _VALID_SCOPES, f"Invalid scope {rd.scope!r} for {pat}"
+    for key, rd in _RULE_REGISTRY.items():
+        assert key.startswith("SC"), f"Key {key!r} must start with 'SC'"
+        assert key == rd.rule_id, f"Key {key!r} must match rule_id {rd.rule_id!r}"
+        assert rd.family in _VALID_FAMILIES, f"Invalid family {rd.family!r} for {key}"
+        assert rd.scope in _VALID_SCOPES, f"Invalid scope {rd.scope!r} for {key}"
         assert rd.default_severity in {"info", "warning", "error"}, (
-            f"Invalid severity {rd.default_severity!r} for {pat}"
+            f"Invalid severity {rd.default_severity!r} for {key}"
         )
 
 
 def test_rule_id_populated(tmp_path):
-    """Mutable default triggers #057 with rule_id SC701 and scope file."""
+    """Mutable default triggers SC701 with scope file."""
     p = _write_py(tmp_path, "def foo(x=[]):\n    return x\n")
     findings = scan_path(p)
-    f057 = [f for f in findings if f.pattern == "#057"]
-    assert len(f057) >= 1
-    assert f057[0].rule_id == "SC701"
-    assert f057[0].scope == "file"
+    f701 = [f for f in findings if f.pattern == "SC701"]
+    assert len(f701) >= 1
+    assert f701[0].scope == "file"
 
 
 def test_resolve_code_formats():
-    """_resolve_code handles SC701, 057, #057, SC057, CC."""
-    assert _resolve_code("SC701") == {"#057"}
-    assert _resolve_code("057") == {"#057"}
-    assert _resolve_code("#057") == {"#057"}
-    assert _resolve_code("SC057") == {"#057"}
-    assert _resolve_code("CC") == {"#CC"}
-    assert _resolve_code("SC210") == {"#CC"}
-    assert _resolve_code("LCOM") == {"#LCOM"}
+    """_resolve_code handles SC codes only."""
+    assert _resolve_code("SC701") == {"SC701"}
+    assert _resolve_code("SC210") == {"SC210"}
+    assert _resolve_code("SC801") == {"SC801"}
+    assert _resolve_code("SC503") == {"SC503"}
+    assert _resolve_code("sc701") == {"SC701"}  # case-insensitive
     assert _resolve_code("NONEXISTENT") == set()
+    assert _resolve_code("057") == set()  # legacy bare numbers no longer resolve
+    assert _resolve_code("#057") == set()  # legacy #-prefix no longer resolves
+    assert _resolve_code("CC") == set()  # legacy alpha codes no longer resolve
 
 
 def test_noqa_with_sc_rule_id(tmp_path):
-    """``# noqa: SC701`` suppresses #057 findings."""
+    """``# noqa: SC701`` suppresses SC701 findings."""
     p = _write_py(tmp_path, "def foo(x=[]):  # noqa: SC701\n    pass\n")
     findings = scan_paths([p])
     patterns = [f.pattern for f in findings]
-    assert "#057" not in patterns
+    assert "SC701" not in patterns
 
 
 def test_config_select_sc_code(tmp_path):
-    """select = ["SC701"] in config keeps only #057 findings."""
+    """select = ["SC701"] in config keeps only SC701 findings."""
     _write_py(tmp_path, "def foo(x=[]): pass\n")
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text('[tool.smellcheck]\nselect = ["SC701"]\n', encoding="utf-8")
     config = load_config(tmp_path)
     findings = scan_paths([tmp_path], config=config)
-    assert all(f.pattern == "#057" for f in findings)
+    assert all(f.pattern == "SC701" for f in findings)
     assert len(findings) >= 1
 
 
 def test_config_ignore_sc_code(tmp_path):
-    """ignore = ["SC701"] in config removes #057 findings."""
+    """ignore = ["SC701"] in config removes SC701 findings."""
     _write_py(tmp_path, "def foo(x=[]): pass\n")
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text('[tool.smellcheck]\nignore = ["SC701"]\n', encoding="utf-8")
     config = load_config(tmp_path)
     findings = scan_paths([tmp_path], config=config)
     patterns = [f.pattern for f in findings]
-    assert "#057" not in patterns
+    assert "SC701" not in patterns
 
 
 def test_scope_filter_cli(tmp_path):
@@ -444,20 +441,18 @@ def test_scope_filter_cli(tmp_path):
     assert all(d.get("scope") == "file" for d in data)
 
 
-def test_json_includes_rule_id(tmp_path):
-    """JSON output includes rule_id and scope fields."""
+def test_json_includes_scope(tmp_path):
+    """JSON output includes scope field; pattern is the SC code."""
     p = _write_py(tmp_path, "def foo(x=[]): pass\n")
     findings = scan_path(p)
     print_findings(findings, output_format="json")
-    # Verify through dataclass fields directly
-    f057 = [f for f in findings if f.pattern == "#057"]
-    assert len(f057) >= 1
+    f701 = [f for f in findings if f.pattern == "SC701"]
+    assert len(f701) >= 1
     from dataclasses import asdict
 
-    d = asdict(f057[0])
-    assert "rule_id" in d
+    d = asdict(f701[0])
     assert "scope" in d
-    assert d["rule_id"] == "SC701"
+    assert d["pattern"] == "SC701"
     assert d["scope"] == "file"
 
 
@@ -540,7 +535,7 @@ def test_fingerprint_resilient_to_line_shift(tmp_path):
     f1 = Finding(
         file=str(tmp_path / "a.py"),
         line=5,
-        pattern="#057",
+        pattern="SC701",
         name="Replace Mutable Default Arguments",
         severity="error",
         message="`foo` has mutable default argument `[]`",
@@ -549,7 +544,7 @@ def test_fingerprint_resilient_to_line_shift(tmp_path):
     f2 = Finding(
         file=str(tmp_path / "a.py"),
         line=42,
-        pattern="#057",
+        pattern="SC701",
         name="Replace Mutable Default Arguments",
         severity="error",
         message="`foo` has mutable default argument `[]`",
@@ -609,8 +604,8 @@ def test_blocking_sleep_in_async(tmp_path):
     )
     findings = scan_path(p)
     patterns = [f.pattern for f in findings]
-    assert "#071" in patterns
-    msg = next(f.message for f in findings if f.pattern == "#071")
+    assert "SC703" in patterns
+    msg = next(f.message for f in findings if f.pattern == "SC703")
     assert "time.sleep()" in msg
 
 
@@ -625,7 +620,7 @@ def test_blocking_requests_in_async(tmp_path):
     )
     findings = scan_path(p)
     patterns = [f.pattern for f in findings]
-    assert "#071" in patterns
+    assert "SC703" in patterns
 
 
 def test_blocking_open_in_async(tmp_path):
@@ -638,7 +633,7 @@ def test_blocking_open_in_async(tmp_path):
     )
     findings = scan_path(p)
     patterns = [f.pattern for f in findings]
-    assert "#071" in patterns
+    assert "SC703" in patterns
 
 
 def test_blocking_subprocess_in_async(tmp_path):
@@ -652,7 +647,7 @@ def test_blocking_subprocess_in_async(tmp_path):
     )
     findings = scan_path(p)
     patterns = [f.pattern for f in findings]
-    assert "#071" in patterns
+    assert "SC703" in patterns
 
 
 def test_blocking_os_path_in_async(tmp_path):
@@ -666,7 +661,7 @@ def test_blocking_os_path_in_async(tmp_path):
     )
     findings = scan_path(p)
     patterns = [f.pattern for f in findings]
-    assert "#071" in patterns
+    assert "SC703" in patterns
 
 
 def test_blocking_input_in_async(tmp_path):
@@ -679,7 +674,7 @@ def test_blocking_input_in_async(tmp_path):
     )
     findings = scan_path(p)
     patterns = [f.pattern for f in findings]
-    assert "#071" in patterns
+    assert "SC703" in patterns
 
 
 def test_no_flag_sync_function(tmp_path):
@@ -693,7 +688,7 @@ def test_no_flag_sync_function(tmp_path):
     )
     findings = scan_path(p)
     patterns = [f.pattern for f in findings]
-    assert "#071" not in patterns
+    assert "SC703" not in patterns
 
 
 def test_no_flag_nested_def_in_async(tmp_path):
@@ -708,7 +703,7 @@ def test_no_flag_nested_def_in_async(tmp_path):
     """,
     )
     findings = scan_path(p)
-    blocking = [f for f in findings if f.pattern == "#071"]
+    blocking = [f for f in findings if f.pattern == "SC703"]
     assert blocking == []
 
 
@@ -723,7 +718,7 @@ def test_no_flag_asyncio_to_thread(tmp_path):
     """,
     )
     findings = scan_path(p)
-    blocking = [f for f in findings if f.pattern == "#071"]
+    blocking = [f for f in findings if f.pattern == "SC703"]
     assert blocking == []
 
 
@@ -739,7 +734,7 @@ def test_no_flag_run_in_executor(tmp_path):
     """,
     )
     findings = scan_path(p)
-    blocking = [f for f in findings if f.pattern == "#071"]
+    blocking = [f for f in findings if f.pattern == "SC703"]
     assert blocking == []
 
 
@@ -755,5 +750,5 @@ def test_multiple_blocking_calls(tmp_path):
     """,
     )
     findings = scan_path(p)
-    blocking = [f for f in findings if f.pattern == "#071"]
+    blocking = [f for f in findings if f.pattern == "SC703"]
     assert len(blocking) >= 2

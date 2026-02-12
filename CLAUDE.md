@@ -40,19 +40,17 @@ The detector has four layers that run in sequence:
 
 ### Key data structures
 
-- `RuleDef` — rule metadata (rule_id, pattern_ref, family, scope, severity)
-- `Finding` — detection result (file, line, pattern, rule_id, severity, message)
+- `RuleDef` — rule metadata (rule_id, name, family, scope, severity)
+- `Finding` — detection result (file, line, pattern, name, severity, message)
 - `ClassInfo` — per-class OO metrics collected during AST walk
 - `FileData` — per-file summary passed to cross-file analysis
-- `_RULE_REGISTRY` — maps pattern refs (`#057`) to `RuleDef` with SC codes (`SC701`)
+- `_RULE_REGISTRY` — maps SC codes (`SC701`) to `RuleDef`
 
 ### Rule naming
 
-Dual naming for backward compatibility:
-- **Legacy**: `#001`–`#070`, `#CC`, `#FE`, `#DIT`, etc.
-- **SC codes**: SC1xx (state), SC2xx (functions), SC3xx (types), SC4xx (control), SC5xx (architecture), SC6xx (hygiene), SC7xx (idioms), SC8xx (metrics)
+SC codes are the sole identifier: SC1xx (state), SC2xx (functions), SC3xx (types), SC4xx (control), SC5xx (architecture), SC6xx (hygiene), SC7xx (idioms), SC8xx (metrics).
 
-Both forms work in `--select`, `--ignore`, and `# noqa` comments.
+SC codes work in `--select`, `--ignore`, and `# noqa` comments.
 
 ## Adding a new check
 

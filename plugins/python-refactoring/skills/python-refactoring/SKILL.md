@@ -17,93 +17,93 @@ description: "Python refactoring catalog with 82 patterns covering immutability,
 
 | Code Smell | Patterns | File |
 |---|---|---|
-| Setters / half-built objects | 001, 016 | state.md |
-| Mutable default args | 057 | idioms.md |
-| Unprotected public attributes | 009 | state.md |
-| Magic numbers / constants | 003 | hygiene.md |
-| Variables that never change | 008 | state.md |
-| Boolean flags for roles/states | 017 | state.md |
+| Setters / half-built objects | SC101, SC104 | state.md |
+| Mutable default args | SC701 | idioms.md |
+| Unprotected public attributes | SC103 | state.md |
+| Magic numbers / constants | SC601 | hygiene.md |
+| Variables that never change | SC102 | state.md |
+| Boolean flags for roles/states | SC105 | state.md |
 | Stale cached/derived attributes | 030 | state.md |
-| Long function, multiple concerns | 002, 010 | functions.md |
+| Long function, multiple concerns | SC201, 010 | functions.md |
 | Comments replacing code | 005 | functions.md |
 | Comments explaining what code does | 011 | hygiene.md |
-| Generic names (result, data, tmp) | 006 | functions.md |
-| Duplicated logic | 013 | hygiene.md |
+| Generic names (result, data, tmp) | SC202 | functions.md |
+| Duplicated logic | SC606 | hygiene.md |
 | Near-duplicate functions | 050 | functions.md |
-| Long related parameter lists | 034, 052 | functions.md |
-| Query + modify in same function | 041 | functions.md |
+| Long related parameter lists | SC206, 052 | functions.md |
+| Query + modify in same function | SC207 | functions.md |
 | Static functions hiding deps | 020 | functions.md |
-| `input()` in business logic | 026 | functions.md |
+| `input()` in business logic | SC203 | functions.md |
 | Getters exposing data | 027 | functions.md |
 | Need to test private methods | 037 | functions.md |
-| Unused function parameters | 064 | functions.md |
-| Long lambda expressions | 066 | functions.md |
-| Type-checking if/elif chains | 014 | types.md |
+| Unused function parameters | SC208 | functions.md |
+| Long lambda expressions | SC209 | functions.md |
+| Type-checking if/elif chains | SC302 | types.md |
 | `isinstance()` dispatch | 060 | idioms.md |
 | Dicts as objects (stringly-typed) | 012 | types.md |
 | Raw primitives with implicit rules | 019, 044 | types.md |
 | Raw lists, no domain meaning | 038 | types.md |
-| Boilerplate `__init__/__repr__/__eq__` | 061 | idioms.md |
-| Related functions without a class | 007 | types.md |
+| Boilerplate `__init__/__repr__/__eq__` | SC304 | idioms.md |
+| Related functions without a class | SC301 | types.md |
 | Sibling classes with duplicate behavior | 022 | types.md |
 | Inheritance without "is-a" | 023 | types.md |
 | Constructor needs descriptive name | 048 | types.md |
-| Scattered `None` checks | 015, 029 | types.md |
-| Lazy class (too few methods) | 069 | types.md |
-| Temporary fields (used in few methods) | 070 | types.md |
-| Deep nesting | 039 | control.md |
-| Imperative loops with accumulation | 040 | control.md |
-| Complex boolean expressions | 042 | control.md |
+| Scattered `None` checks | 015, SC204 | types.md |
+| Lazy class (too few methods) | SC306 | types.md |
+| Temporary fields (used in few methods) | SC307 | types.md |
+| Deep nesting | SC402 | control.md |
+| Imperative loops with accumulation | SC403 | control.md |
+| Complex boolean expressions | SC404 | control.md |
 | Long expressions, no named parts | 043 | control.md |
 | Loop doing two things | 046 | control.md |
 | Parse/compute/format mixed | 047 | control.md |
 | Clunky algorithm | 049 | control.md |
-| Boolean flag controlling loop | 055 | control.md |
+| Boolean flag controlling loop | SC405 | control.md |
 | Complex if/elif dispatch | 056 | control.md |
 | Related statements scattered | 053 | control.md |
-| Missing default else branch | 068 | control.md |
-| Complex comprehensions | 067 | control.md |
-| Singleton / global state | 018, 024 | architecture.md |
+| Missing default else branch | SC407 | control.md |
+| Complex comprehensions | SC406 | control.md |
+| Singleton / global state | SC303, SC106 | architecture.md |
 | Same exception for biz + infra | 035 | architecture.md |
-| Chained `.attr.attr.attr` | 054 | architecture.md |
+| Chained `.attr.attr.attr` | SC502 | architecture.md |
 | No fail-fast assertions | 045 | architecture.md |
-| Dead code / commented blocks | 021 | hygiene.md |
-| Unused exceptions | 004 | hygiene.md |
-| Empty catch blocks | 065 | hygiene.md |
+| Dead code / commented blocks | SC401 | hygiene.md |
+| Unused exceptions | SC602 | hygiene.md |
+| Empty catch blocks | SC605 | hygiene.md |
 | Giant regex | 025 | hygiene.md |
-| Excessive decorators | 033 | hygiene.md |
-| String concatenation for multiline | 036 | hygiene.md |
+| Excessive decorators | SC205 | hygiene.md |
+| String concatenation for multiline | SC603 | hygiene.md |
 | Inconsistent formatting | 032 | hygiene.md |
 | Cryptic error messages | 031 | hygiene.md |
-| Sequential IDs leaking info | 028 | architecture.md |
-| Error codes instead of exceptions | 051 | architecture.md |
-| Manual try/finally cleanup | 058, 063 | idioms.md |
+| Sequential IDs leaking info | SC107 | architecture.md |
+| Error codes instead of exceptions | SC501 | architecture.md |
+| Manual try/finally cleanup | SC702, SC604 | idioms.md |
 | Full lists when streaming works | 059 | idioms.md |
-| Indexing tuples by position | 062 | idioms.md |
-| Shotgun surgery (wide call spread) | SHO | architecture.md |
-| Deep inheritance tree | DIT | types.md |
-| Wide hierarchy (too many subclasses) | WHI | types.md |
-| Inappropriate intimacy | INT | architecture.md |
-| Speculative generality (unused ABCs) | SPG | architecture.md |
-| Unstable dependency | UDE | architecture.md |
-| Low class cohesion (LCOM) | LCOM | metrics.md |
-| High coupling between objects (CBO) | CBO | metrics.md |
-| Excessive fan-out | FIO | metrics.md |
-| High response for class (RFC) | RFC | metrics.md |
-| Middle man (excessive delegation) | MID | metrics.md |
+| Indexing tuples by position | SC305 | idioms.md |
+| Shotgun surgery (wide call spread) | SC505 | architecture.md |
+| Deep inheritance tree | SC308 | types.md |
+| Wide hierarchy (too many subclasses) | SC309 | types.md |
+| Inappropriate intimacy | SC506 | architecture.md |
+| Speculative generality (unused ABCs) | SC507 | architecture.md |
+| Unstable dependency | SC508 | architecture.md |
+| Low class cohesion (LCOM) | SC801 | metrics.md |
+| High coupling between objects (CBO) | SC802 | metrics.md |
+| Excessive fan-out | SC803 | metrics.md |
+| High response for class (RFC) | SC804 | metrics.md |
+| Middle man (excessive delegation) | SC805 | metrics.md |
 
 ## Reference Files
 
 Load **only** the file(s) matching detected smells:
 
-- `references/state.md` -- Immutability, setters, attributes (001, 008, 009, 016, 017, 030)
-- `references/functions.md` -- Method extraction, naming, parameters, CQS (002, 005, 006, 010, 020, 026, 027, 034, 037, 041, 050, 052, 064, 066)
-- `references/types.md` -- Class design, reification, polymorphism, nulls (007, 012, 014, 015, 019, 022, 023, 029, 038, 044, 048, 069, 070, DIT, WHI)
-- `references/control.md` -- Guard clauses, pipelines, conditionals, phases (039-043, 046, 047, 049, 053, 055, 056, 067, 068)
-- `references/architecture.md` -- DI, singletons, exceptions, delegates (018, 024, 028, 035, 045, 051, 054, SHO, INT, SPG, UDE)
-- `references/hygiene.md` -- Constants, dead code, comments, style (003, 004, 011, 013, 021, 025, 031-033, 036, 065)
-- `references/idioms.md` -- Context managers, generators, unpacking, protocols (057-063)
-- `references/metrics.md` -- OO metrics: cohesion, coupling, fan-out, response, delegation (LCOM, CBO, FIO, RFC, MID)
+- `references/state.md` -- Immutability, setters, attributes (SC101, SC102, SC103, SC104, SC105, 030)
+- `references/functions.md` -- Method extraction, naming, parameters, CQS (SC201, 005, SC202, 010, 020, SC203, 027, SC206, 037, SC207, 050, 052, SC208, SC209)
+- `references/types.md` -- Class design, reification, polymorphism, nulls (SC301, 012, SC302, 015, 019, 022, 023, SC204, 038, 044, 048, SC306, SC307, SC308, SC309)
+- `references/control.md` -- Guard clauses, pipelines, conditionals, phases (SC402-SC404, 043, 046, 047, 049, 053, SC405, 056, SC406, SC407)
+- `references/architecture.md` -- DI, singletons, exceptions, delegates (SC303, SC106, SC107, 035, 045, SC501, SC502, SC505, SC506, SC507, SC508)
+- `references/hygiene.md` -- Constants, dead code, comments, style (SC601, SC602, 011, SC606, SC401, 025, 031-032, SC205, SC603, SC605)
+- `references/idioms.md` -- Context managers, generators, unpacking, protocols (SC701, SC702, 059, 060, SC304, SC305, SC604)
+- `references/metrics.md` -- OO metrics: cohesion, coupling, fan-out, response, delegation (SC801, SC802, SC803, SC804, SC805)
 
 ## Automated Smell Detector
 
@@ -121,11 +121,11 @@ smellcheck src/
 smellcheck src/ --min-severity warning --fail-on warning
 ```
 
-**Per-file detections** (40): #001 setters, #002 long functions, #003 magic numbers, #004 bare except, #006 generic names, #007 extract class, #008 UPPER_CASE without Final, #009 public attrs, #014 isinstance chains, #016 half-built objects, #017 boolean flags, #018 singleton, #021 dead code after return, #024 global mutables, #026 input() in logic, #028 sequential IDs, #029 return None|list, #033 excessive decorators, #034 too many params, #036 string concatenation, #039 deep nesting, #040 loop+append, #041 CQS violation, #042 complex booleans, #051 error codes, #054 Law of Demeter, #055 control flags, #057 mutable defaults, #058 open without with, #061 dataclass candidate, #062 sequential indexing, #063 contextlib candidate, #CC cyclomatic complexity, #064 unused parameters, #065 empty catch block, #066 long lambda, #067 complex comprehension, #068 missing else, #069 lazy class, #070 temporary field.
+**Per-file detections** (40): SC101 setters, SC201 long functions, SC601 magic numbers, SC602 bare except, SC202 generic names, SC301 extract class, SC102 UPPER_CASE without Final, SC103 public attrs, SC302 isinstance chains, SC104 half-built objects, SC105 boolean flags, SC303 singleton, SC401 dead code after return, SC106 global mutables, SC203 input() in logic, SC107 sequential IDs, SC204 return None|list, SC205 excessive decorators, SC206 too many params, SC603 string concatenation, SC402 deep nesting, SC403 loop+append, SC207 CQS violation, SC404 complex booleans, SC501 error codes, SC502 Law of Demeter, SC405 control flags, SC701 mutable defaults, SC702 open without with, SC304 dataclass candidate, SC305 sequential indexing, SC604 contextlib candidate, SC210 cyclomatic complexity, SC208 unused parameters, SC605 empty catch block, SC209 long lambda, SC406 complex comprehension, SC407 missing else, SC306 lazy class, SC307 temporary field.
 
-**Cross-file detections** (10): #013 duplicate functions (AST-normalized hashing), #CYC cyclic imports (DFS), #GOD god modules, #FE feature envy, #SHO shotgun surgery, #DIT deep inheritance, #WHI wide hierarchy, #INT inappropriate intimacy, #SPG speculative generality, #UDE unstable dependency.
+**Cross-file detections** (10): SC606 duplicate functions (AST-normalized hashing), SC503 cyclic imports (DFS), SC504 god modules, SC211 feature envy, SC505 shotgun surgery, SC308 deep inheritance, SC309 wide hierarchy, SC506 inappropriate intimacy, SC507 speculative generality, SC508 unstable dependency.
 
-**OO metrics** (5): #LCOM lack of cohesion, #CBO coupling between objects, #FIO fan-out, #RFC response for class, #MID middle man.
+**OO metrics** (5): SC801 lack of cohesion, SC802 coupling between objects, SC803 fan-out, SC804 response for class, SC805 middle man.
 
 Run the detector first for a quick scan, then use the reference files to understand and apply the suggested refactorings.
 
@@ -135,7 +135,7 @@ Run the detector first for a quick scan, then use the reference files to underst
 2. Receive code -> scan for smells using table (manual or from script output)
 3. Map smells to pattern numbers
 4. Read **only** the relevant reference file(s)
-5. Present: "Found N smells -> applying #X, #Y, #Z"
+5. Present: "Found N smells -> applying SCxxx, SCyyy, SCzzz"
 6. Show refactored code with explanations
 7. Note trade-offs and breaking changes
 
