@@ -41,22 +41,26 @@ repos:
 Upload smellcheck findings to GitHub Code Scanning so they appear as native alerts in the Security tab and as PR annotations:
 
 ```yaml
-code-scanning:
-  runs-on: ubuntu-latest
-  permissions:
-    security-events: write
-  steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-    - run: pip install smellcheck
-    - run: smellcheck src/ --format sarif --min-severity warning > results.sarif
-      continue-on-error: true
-    - uses: github/codeql-action/upload-sarif@v4
-      with:
-        sarif_file: results.sarif
-      if: always()
+name: Code Scanning
+on: [push, pull_request]
+
+jobs:
+  code-scanning:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install smellcheck
+      - run: smellcheck src/ --format sarif --min-severity warning > results.sarif
+        continue-on-error: true
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
+        if: always()
 ```
 
 ---
