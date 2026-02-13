@@ -15,7 +15,6 @@
   <a href="https://github.com/cheickmec/smellcheck/actions/workflows/ci.yml"><img src="https://github.com/cheickmec/smellcheck/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://pypistats.org/packages/smellcheck"><img src="https://img.shields.io/pypi/dm/smellcheck" alt="Downloads"></a>
   <a href="https://github.com/cheickmec/smellcheck/blob/main/docs/installation.md#pre-commit"><img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit" alt="pre-commit"></a>
-  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
   <a href="https://github.com/cheickmec/smellcheck/blob/main/LICENSE"><img src="https://img.shields.io/github/license/cheickmec/smellcheck" alt="License"></a>
 </p>
 
@@ -218,18 +217,18 @@ Each pattern includes a description, before/after code examples, and trade-offs:
 
 | File | Patterns |
 |------|----------|
-| `state.md` | Immutability, setters, attributes (SC101, SC102, SC103, SC104, SC105, 030) |
-| `functions.md` | Extraction, naming, parameters, CQS (SC201, 010, 020, SC203, 027, SC206, 037, SC207, 050, 052, SC208, SC209) |
-| `types.md` | Classes, reification, polymorphism, nulls (SC301, 012, SC302, 015, 019, 022, 023, SC204, 038, 044, 048, SC306, SC307, SC308, SC309) |
-| `control.md` | Guards, pipelines, conditionals, phases (SC402, SC403, SC207, SC404, 046, 047, 049, 053, SC405, 056, SC406, SC407) |
-| `architecture.md` | DI, singletons, exceptions, delegates (SC303, SC106, SC107, 035, 045, SC501, SC502, SC505, SC506, SC507, SC508) |
-| `hygiene.md` | Constants, dead code, comments, style (SC601, SC602, 011, SC606, SC401, 025, 031, 032, SC205, SC603, SC605) |
-| `idioms.md` | Context managers, generators, unpacking, async (SC701, SC702, SC703, 059, 060, SC304, SC305, SC604) |
-| `metrics.md` | OO metrics: cohesion, coupling, fan-out, response, delegation (SC801, SC802, SC803, SC804, SC805) |
+| [`state.md`](https://github.com/cheickmec/smellcheck/blob/main/plugins/python-refactoring/skills/python-refactoring/references/state.md) | Immutability, setters, attributes (SC101–SC107) |
+| [`functions.md`](https://github.com/cheickmec/smellcheck/blob/main/plugins/python-refactoring/skills/python-refactoring/references/functions.md) | Extraction, naming, parameters, CQS (SC201–SC210) |
+| [`types.md`](https://github.com/cheickmec/smellcheck/blob/main/plugins/python-refactoring/skills/python-refactoring/references/types.md) | Classes, reification, polymorphism, nulls (SC301–SC309) |
+| [`control.md`](https://github.com/cheickmec/smellcheck/blob/main/plugins/python-refactoring/skills/python-refactoring/references/control.md) | Guards, pipelines, conditionals, phases (SC401–SC407) |
+| [`architecture.md`](https://github.com/cheickmec/smellcheck/blob/main/plugins/python-refactoring/skills/python-refactoring/references/architecture.md) | DI, singletons, exceptions, delegates (SC501–SC508) |
+| [`hygiene.md`](https://github.com/cheickmec/smellcheck/blob/main/plugins/python-refactoring/skills/python-refactoring/references/hygiene.md) | Constants, dead code, comments, style (SC601–SC606) |
+| [`idioms.md`](https://github.com/cheickmec/smellcheck/blob/main/plugins/python-refactoring/skills/python-refactoring/references/idioms.md) | Context managers, generators, unpacking, async (SC701–SC703) |
+| [`metrics.md`](https://github.com/cheickmec/smellcheck/blob/main/plugins/python-refactoring/skills/python-refactoring/references/metrics.md) | OO metrics: cohesion, coupling, fan-out, response, delegation (SC801–SC805) |
 
 ## How It Compares
 
-| Feature | smellcheck | PyExamine | SMART-Dal | Pyscent |
+| Feature | smellcheck | [PyExamine](https://github.com/KarthikShivasankar/python_smells_detector) | [SMART-Dal](https://github.com/SMART-Dal/smell-detector-python) | [Pyscent](https://github.com/whyjay17/Pyscent) |
 |---------|------------|-----------|-----------|---------|
 | Automated detections | 56 | 49 | 31 | 11 |
 | Refactoring guidance | 83 patterns | None | None | None |
@@ -241,7 +240,7 @@ Each pattern includes a description, before/after code examples, and trade-offs:
 
 ## Contributing
 
-Contributions welcome. The core detector is `src/smellcheck/detector.py` -- add new checks by extending the `SmellDetector` AST visitor class and adding a cross-file analysis function if needed.
+Contributions welcome — see [CONTRIBUTING.md](https://github.com/cheickmec/smellcheck/blob/main/CONTRIBUTING.md) for the full guide. The core detector is `src/smellcheck/detector.py`; add new checks by extending the `SmellDetector` AST visitor class and adding a cross-file analysis function if needed.
 
 ```bash
 # Development setup
