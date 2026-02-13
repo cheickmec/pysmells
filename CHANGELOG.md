@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2](https://github.com/cheickmec/smellcheck/compare/v0.3.1...v0.3.2) (2026-02-13)
+
+
+### Features
+
+* add --explain CLI command for per-rule documentation ([e34ca66](https://github.com/cheickmec/smellcheck/commit/e34ca6671659133efaa740e0eb17cd9639d017a9)), closes [#7](https://github.com/cheickmec/smellcheck/issues/7)
+* add README link validation (pre-commit + CI) ([1755188](https://github.com/cheickmec/smellcheck/commit/175518807f0764654c0c11e2753569528170159d))
+
+
+### Bug Fixes
+
+* accept SC4xx form in --explain and update usage header ([2dd3968](https://github.com/cheickmec/smellcheck/commit/2dd39684cd9349a2c84397edcd8c51b414474823))
+* make SARIF workflow snippet a complete valid workflow ([1690dab](https://github.com/cheickmec/smellcheck/commit/1690dabae5bf2d2e9015da91dccc6d9ec1b40864))
+
+
+### Documentation
+
+* extract installation guide from README into dedicated doc ([b0b7f34](https://github.com/cheickmec/smellcheck/commit/b0b7f349db00a564e533413d8fdb9a2d6112275e))
+* improve README links and remove misleading Ruff badge ([6d73240](https://github.com/cheickmec/smellcheck/commit/6d7324034825e0f41a6fe4b46f2c923c548e54b3))
+
+
+### Miscellaneous
+
+* gitignore .claude/ and .omc/ directories ([e43b79c](https://github.com/cheickmec/smellcheck/commit/e43b79cebfad3569f8ce98d3614542c6a2a9faf9))
+
 ## [0.3.1](https://github.com/cheickmec/smellcheck/compare/v0.3.0...v0.3.1) (2026-02-13)
 
 
