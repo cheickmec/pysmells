@@ -12,7 +12,9 @@ cp "$SRC/detector.py" "$DEST/detector.py"
 
 cat > "$DEST/__init__.py" << EOF
 """smellcheck -- vendored for Agent Skills (do not edit, run scripts/vendor-smellcheck.sh)."""
+# x-release-please-start-version
 __version__ = "$VERSION"
+# x-release-please-end
 EOF
 
 echo "Vendored smellcheck $VERSION into skill bundle."
