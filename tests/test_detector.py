@@ -10,16 +10,29 @@ from pathlib import Path
 
 from smellcheck import __version__
 from smellcheck.detector import (
+    _DEFAULT_CACHE_DIR,
     _RULE_DESCRIPTIONS,
     _RULE_EXAMPLES,
     _RULE_REGISTRY,
     _VALID_FAMILIES,
     _VALID_SCOPES,
+    _cache_key,
+    _clear_cache,
+    _config_hash,
+    _deserialize_file_data,
+    _deserialize_finding,
     _fingerprint,
     _parse_args,
+    _read_cache,
     _resolve_code,
+    _serialize_file_data,
+    _serialize_finding,
+    _write_cache,
+    FileData,
+    Finding,
     load_config,
     print_findings,
+    scan_file,
     scan_path,
     scan_paths,
 )
@@ -843,3 +856,210 @@ def test_explain_all_rules_have_examples_entry():
     """Every rule in the registry must have an entry in _RULE_EXAMPLES."""
     for code in _RULE_REGISTRY:
         assert code in _RULE_EXAMPLES, f"{code} missing from _RULE_EXAMPLES"
+
+
+# ---------------------------------------------------------------------------
+# File-level caching
+# ---------------------------------------------------------------------------
+
+
+def test_cache_hit_skips_reanalysis(tmp_path):
+    """Second scan of unchanged file should use cache and produce same results."""
+    p = _write_py(tmp_path, """\
+        def process(items=[]):
+            pass
+    """)
+    cache_dir = tmp_path / ".smellcheck-cache"
+
+    # First scan — populates cache
+    findings1 = scan_paths([tmp_path], cache_dir=cache_dir, use_cache=True)
+    assert cache_dir.is_dir()
+    cache_files = list(cache_dir.glob("*.json"))
+    assert len(cache_files) == 1
+
+    # Second scan — should hit cache, same results
+    findings2 = scan_paths([tmp_path], cache_dir=cache_dir, use_cache=True)
+    assert len(findings2) == len(findings1)
+    for f1, f2 in zip(findings1, findings2):
+        assert f1.pattern == f2.pattern
+        assert f1.line == f2.line
+        assert f1.message == f2.message
+
+
+def test_cache_miss_on_file_change(tmp_path):
+    """Modifying a file should invalidate its cache entry."""
+    p = _write_py(tmp_path, """\
+        def process(items=[]):
+            pass
+    """)
+    cache_dir = tmp_path / ".smellcheck-cache"
+
+    # First scan
+    findings1 = scan_paths([tmp_path], cache_dir=cache_dir, use_cache=True)
+    assert any(f.pattern == "SC701" for f in findings1)
+
+    # Modify file to remove the smell
+    p.write_text("def process(items=None):\n    pass\n", encoding="utf-8")
+
+    # Second scan — cache miss, new results
+    findings2 = scan_paths([tmp_path], cache_dir=cache_dir, use_cache=True)
+    assert not any(f.pattern == "SC701" for f in findings2)
+
+    # Should now have 2 cache files (old stale + new)
+    cache_files = list(cache_dir.glob("*.json"))
+    assert len(cache_files) == 2
+
+
+def test_no_cache_flag_disables_caching(tmp_path):
+    """use_cache=False should not create a cache directory."""
+    _write_py(tmp_path, """\
+        x = 1
+    """)
+    cache_dir = tmp_path / ".smellcheck-cache"
+
+    scan_paths([tmp_path], cache_dir=cache_dir, use_cache=False)
+    assert not cache_dir.exists()
+
+
+def test_clear_cache(tmp_path):
+    """_clear_cache should remove all .json files from cache dir."""
+    cache_dir = tmp_path / ".smellcheck-cache"
+    cache_dir.mkdir()
+    (cache_dir / "abc123.json").write_text("{}", encoding="utf-8")
+    (cache_dir / "def456.json").write_text("{}", encoding="utf-8")
+
+    removed = _clear_cache(cache_dir)
+    assert removed == 2
+    assert list(cache_dir.glob("*.json")) == []
+
+
+def test_cache_invalidated_by_config_change(tmp_path):
+    """Different config should produce different cache keys."""
+    p = _write_py(tmp_path, """\
+        def process(items=[]):
+            pass
+    """)
+    source = p.read_text(encoding="utf-8")
+
+    key1 = _cache_key(source, _config_hash(None), "0.3.2")
+    key2 = _cache_key(source, _config_hash({"select": ["SC701"]}), "0.3.2")
+    assert key1 != key2
+
+
+def test_cache_invalidated_by_version_change(tmp_path):
+    """Different smellcheck version should produce different cache keys."""
+    p = _write_py(tmp_path, """\
+        x = 1
+    """)
+    source = p.read_text(encoding="utf-8")
+    cfg = _config_hash(None)
+
+    key1 = _cache_key(source, cfg, "0.3.1")
+    key2 = _cache_key(source, cfg, "0.3.2")
+    assert key1 != key2
+
+
+def test_finding_serialization_roundtrip():
+    """Finding should survive JSON serialization/deserialization."""
+    f = Finding(
+        file="test.py",
+        line=42,
+        pattern="SC701",
+        name="Mutable Default",
+        severity="error",
+        message="mutable default arg",
+        category="idioms",
+        scope="file",
+    )
+    d = _serialize_finding(f)
+    f2 = _deserialize_finding(d)
+    assert f == f2
+
+
+def test_file_data_serialization_roundtrip(tmp_path):
+    """FileData should survive serialization via scan_file."""
+    p = _write_py(tmp_path, """\
+        class Foo:
+            def __init__(self):
+                self.x = 1
+            def bar(self):
+                return self.x
+    """)
+    findings, fd = scan_file(p)
+    assert fd is not None
+
+    serialized = _serialize_file_data(fd)
+    restored = _deserialize_file_data(serialized)
+
+    assert restored.filepath == fd.filepath
+    assert restored.toplevel_defs == fd.toplevel_defs
+    assert restored.class_names == fd.class_names
+    assert restored.total_lines == fd.total_lines
+
+
+def test_cache_cross_file_still_runs(tmp_path):
+    """Cross-file analysis must still run even when per-file results are cached."""
+    # Create two files that import each other (cyclic import)
+    (tmp_path / "a.py").write_text(
+        "import b\ndef fa(): pass\n", encoding="utf-8"
+    )
+    (tmp_path / "b.py").write_text(
+        "import a\ndef fb(): pass\n", encoding="utf-8"
+    )
+    cache_dir = tmp_path / ".smellcheck-cache"
+
+    # First scan — populates cache + cross-file
+    findings1 = scan_paths([tmp_path], cache_dir=cache_dir, use_cache=True)
+    cyclic1 = [f for f in findings1 if f.pattern == "SC501"]
+
+    # Second scan — per-file cached, cross-file must still run
+    findings2 = scan_paths([tmp_path], cache_dir=cache_dir, use_cache=True)
+    cyclic2 = [f for f in findings2 if f.pattern == "SC501"]
+
+    assert len(cyclic1) == len(cyclic2)
+
+
+def test_cli_no_cache(tmp_path):
+    """--no-cache flag should work via CLI."""
+    _write_py(tmp_path, "x = 1\n")
+    result = _run_cli(str(tmp_path), "--no-cache")
+    assert result.returncode == 0
+    assert not (tmp_path / _DEFAULT_CACHE_DIR).exists()
+
+
+def test_cli_cache_dir(tmp_path):
+    """--cache-dir should use the specified directory."""
+    _write_py(tmp_path, "x = 1\n")
+    custom_cache = tmp_path / "my-cache"
+    result = _run_cli(str(tmp_path), "--cache-dir", str(custom_cache))
+    assert result.returncode == 0
+    assert custom_cache.is_dir()
+
+
+def test_cli_clear_cache(tmp_path):
+    """--clear-cache should remove cache entries and exit."""
+    cache_dir = tmp_path / _DEFAULT_CACHE_DIR
+    cache_dir.mkdir()
+    (cache_dir / "test.json").write_text("{}", encoding="utf-8")
+
+    result = _run_cli("--clear-cache", "--cache-dir", str(cache_dir))
+    assert result.returncode == 0
+    assert "Cleared 1" in result.stdout
+    assert list(cache_dir.glob("*.json")) == []
+
+
+def test_corrupted_cache_treated_as_miss(tmp_path):
+    """Corrupted cache file should be silently ignored (cache miss)."""
+    p = _write_py(tmp_path, """\
+        def process(items=[]):
+            pass
+    """)
+    cache_dir = tmp_path / ".smellcheck-cache"
+    cache_dir.mkdir()
+
+    # Write a corrupted cache file
+    (cache_dir / "fake.json").write_text("NOT JSON", encoding="utf-8")
+
+    # Scan should work fine, treating corrupted entry as miss
+    findings = scan_paths([tmp_path], cache_dir=cache_dir, use_cache=True)
+    assert any(f.pattern == "SC701" for f in findings)

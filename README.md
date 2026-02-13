@@ -80,6 +80,15 @@ smellcheck src/ --generate-baseline > .smellcheck-baseline.json
 # Only report findings not in the baseline
 smellcheck src/ --baseline .smellcheck-baseline.json
 
+# Disable caching for a fresh scan
+smellcheck src/ --no-cache
+
+# Use a custom cache directory
+smellcheck src/ --cache-dir .my-cache
+
+# Clear cached results
+smellcheck --clear-cache
+
 # Show documentation for a rule (description + before/after example)
 smellcheck --explain SC701
 
@@ -102,6 +111,8 @@ per-file-ignores = {"tests/*" = ["SC201", "SC206"]}  # per-path overrides
 fail-on = "warning"                  # override default fail-on
 format = "text"                      # override default format
 baseline = ".smellcheck-baseline.json"  # suppress known findings
+cache = true                           # enable file-level caching (default: true)
+cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-cache)
 ```
 
 CLI flags override config values.
@@ -135,6 +146,34 @@ Fingerprints are resilient to line-number changes — renaming or moving code ar
 
 `--generate-baseline` and `--baseline` are mutually exclusive.
 
+## Caching
+
+smellcheck caches per-file analysis results in `.smellcheck-cache/` to skip unchanged files on repeated scans. This is especially useful for pre-commit hooks and editor integrations.
+
+Cache entries are keyed by file content hash, config hash, and smellcheck version — any change invalidates the relevant entry. Cross-file analysis (cyclic imports, duplicate code, etc.) always re-runs since it depends on the full file set.
+
+```bash
+# Caching is enabled by default — just run normally
+smellcheck src/
+
+# Disable caching for a guaranteed fresh scan
+smellcheck src/ --no-cache
+
+# Use a custom cache directory
+smellcheck src/ --cache-dir /tmp/sc-cache
+
+# Clear all cached results
+smellcheck --clear-cache
+```
+
+Add `.smellcheck-cache/` to your `.gitignore`. You can also configure caching in `pyproject.toml`:
+
+```toml
+[tool.smellcheck]
+cache = false                    # disable caching
+cache-dir = ".smellcheck-cache"  # custom cache directory
+```
+
 ## Features
 
 - **56 automated smell checks** -- per-file AST analysis, cross-file dependency analysis, and OO metrics
@@ -143,6 +182,7 @@ Fingerprints are resilient to line-number changes — renaming or moving code ar
 - **Multiple output formats** -- text (terminal), JSON (machine-readable), GitHub annotations (CI), SARIF 2.1.0 (Code Scanning)
 - **Configurable** -- pyproject.toml config, inline suppression, CLI overrides
 - **Baseline support** -- adopt incrementally by suppressing existing findings and only failing on new ones
+- **File-level caching** -- content-hash based caching skips unchanged files for fast repeated scans
 - **Multiple distribution channels** -- pip, GitHub Action, pre-commit, Agent Skills ([full list](https://github.com/cheickmec/smellcheck/blob/main/docs/installation.md))
 
 ## Detected Patterns

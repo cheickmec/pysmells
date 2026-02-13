@@ -546,6 +546,212 @@ def load_config(target: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# File-level caching (--no-cache / --cache-dir / --clear-cache)
+# ---------------------------------------------------------------------------
+
+_DEFAULT_CACHE_DIR: Final = ".smellcheck-cache"
+_CACHE_VERSION: Final = 1
+
+
+def _cache_key(source: str, config_hash: str, version: str) -> str:
+    """Cache key combining content hash, config hash, and tool version."""
+    content_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    return f"{content_hash}_{config_hash}_{version}"
+
+
+def _config_hash(config: dict | None) -> str:
+    """Deterministic hash of the config options that affect analysis."""
+    if not config:
+        return "noconfig"
+    # Only hash keys that change which checks run or how they behave
+    relevant = {
+        k: config[k]
+        for k in ("select", "ignore", "per-file-ignores")
+        if k in config
+    }
+    return hashlib.sha256(
+        json.dumps(relevant, sort_keys=True).encode()
+    ).hexdigest()[:16]
+
+
+def _serialize_finding(f: Finding) -> dict:
+    """Convert a Finding to a JSON-serializable dict."""
+    return {
+        "file": f.file,
+        "line": f.line,
+        "pattern": f.pattern,
+        "name": f.name,
+        "severity": f.severity,
+        "message": f.message,
+        "category": f.category,
+        "scope": f.scope,
+    }
+
+
+def _deserialize_finding(d: dict) -> Finding:
+    """Restore a Finding from a cached dict."""
+    return Finding(
+        file=d["file"],
+        line=d["line"],
+        pattern=d["pattern"],
+        name=d["name"],
+        severity=d["severity"],
+        message=d["message"],
+        category=d["category"],
+        scope=d.get("scope", ""),
+    )
+
+
+def _serialize_class_info(ci: ClassInfo) -> dict:
+    """Convert a ClassInfo to a JSON-serializable dict."""
+    return {
+        "name": ci.name,
+        "filepath": ci.filepath,
+        "line": ci.line,
+        "bases": ci.bases,
+        "method_count": ci.method_count,
+        "field_count": ci.field_count,
+        "all_fields": ci.all_fields,
+        "methods_using_fields": {
+            k: sorted(v) for k, v in ci.methods_using_fields.items()
+        },
+        "external_class_accesses": ci.external_class_accesses,
+        "external_method_calls": sorted(ci.external_method_calls),
+        "delegation_count": ci.delegation_count,
+        "non_dunder_method_count": ci.non_dunder_method_count,
+        "is_abstract": ci.is_abstract,
+        "abstract_methods": ci.abstract_methods,
+    }
+
+
+def _deserialize_class_info(d: dict) -> ClassInfo:
+    """Restore a ClassInfo from a cached dict."""
+    return ClassInfo(
+        name=d["name"],
+        filepath=d["filepath"],
+        line=d["line"],
+        bases=d.get("bases", []),
+        method_count=d.get("method_count", 0),
+        field_count=d.get("field_count", 0),
+        all_fields=d.get("all_fields", []),
+        methods_using_fields={
+            k: set(v) for k, v in d.get("methods_using_fields", {}).items()
+        },
+        external_class_accesses=d.get("external_class_accesses", {}),
+        external_method_calls=set(d.get("external_method_calls", [])),
+        delegation_count=d.get("delegation_count", 0),
+        non_dunder_method_count=d.get("non_dunder_method_count", 0),
+        is_abstract=d.get("is_abstract", False),
+        abstract_methods=d.get("abstract_methods", []),
+    )
+
+
+def _serialize_file_data(fd: FileData) -> dict:
+    """Convert a FileData to a JSON-serializable dict."""
+    return {
+        "filepath": fd.filepath,
+        "toplevel_defs": fd.toplevel_defs,
+        "total_lines": fd.total_lines,
+        "imports": fd.imports,
+        "func_signatures": [list(t) for t in fd.func_signatures],
+        "method_external_accesses": [
+            [m, line, cls, acc]
+            for m, line, cls, acc in fd.method_external_accesses
+        ],
+        "class_names": fd.class_names,
+        "class_bases": fd.class_bases,
+        "class_lines": fd.class_lines,
+        "class_info": [_serialize_class_info(ci) for ci in fd.class_info],
+        "defined_functions": sorted(fd.defined_functions),
+        "called_functions": sorted(fd.called_functions),
+        "abstract_classes": sorted(fd.abstract_classes),
+    }
+
+
+def _deserialize_file_data(d: dict) -> FileData:
+    """Restore a FileData from a cached dict."""
+    return FileData(
+        filepath=d["filepath"],
+        toplevel_defs=d.get("toplevel_defs", 0),
+        total_lines=d.get("total_lines", 0),
+        imports=d.get("imports", []),
+        func_signatures=[tuple(t) for t in d.get("func_signatures", [])],
+        method_external_accesses=[
+            (m, line, cls, acc)
+            for m, line, cls, acc in d.get("method_external_accesses", [])
+        ],
+        class_names=d.get("class_names", []),
+        class_bases=d.get("class_bases", {}),
+        class_lines=d.get("class_lines", {}),
+        class_info=[
+            _deserialize_class_info(ci) for ci in d.get("class_info", [])
+        ],
+        defined_functions=set(d.get("defined_functions", [])),
+        called_functions=set(d.get("called_functions", [])),
+        abstract_classes=set(d.get("abstract_classes", [])),
+    )
+
+
+def _read_cache(
+    cache_dir: Path, key: str,
+) -> tuple[list[Finding], FileData] | None:
+    """Read cached per-file results.  Returns None on miss or corruption."""
+    cache_file = cache_dir / f"{key}.json"
+    if not cache_file.exists():
+        return None
+    try:
+        data = json.loads(cache_file.read_text(encoding="utf-8"))
+        if data.get("cache_version") != _CACHE_VERSION:
+            return None
+        findings = [_deserialize_finding(f) for f in data["findings"]]
+        file_data = _deserialize_file_data(data["file_data"])
+        return findings, file_data
+    except Exception:
+        # Corrupted cache entry — treat as miss
+        try:
+            cache_file.unlink()
+        except OSError:
+            pass
+        return None
+
+
+def _write_cache(
+    cache_dir: Path,
+    key: str,
+    findings: list[Finding],
+    file_data: FileData,
+) -> None:
+    """Write per-file results to cache.  Silent on failure."""
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / f"{key}.json"
+        tmp = cache_file.with_suffix(".tmp")
+        data = {
+            "cache_version": _CACHE_VERSION,
+            "findings": [_serialize_finding(f) for f in findings],
+            "file_data": _serialize_file_data(file_data),
+        }
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        tmp.replace(cache_file)  # atomic on POSIX
+    except OSError:
+        pass
+
+
+def _clear_cache(cache_dir: Path) -> int:
+    """Delete all cache entries.  Returns number of files removed."""
+    removed = 0
+    if cache_dir.is_dir():
+        for f in cache_dir.iterdir():
+            if f.suffix == ".json":
+                try:
+                    f.unlink()
+                    removed += 1
+                except OSError:
+                    pass
+    return removed
+
+
+# ---------------------------------------------------------------------------
 # Baseline support (--generate-baseline / --baseline)
 # ---------------------------------------------------------------------------
 
@@ -3079,6 +3285,8 @@ def scan_paths(
     targets: list[Path],
     *,
     config: dict | None = None,
+    cache_dir: Path | None = None,
+    use_cache: bool = True,
 ) -> list[Finding]:
     """Scan multiple paths, aggregate findings, run cross-file analysis once.
 
@@ -3090,10 +3298,36 @@ def scan_paths(
         Optional ``[tool.smellcheck]`` config dict. When provided, findings
         matching ``ignore`` patterns or ``per-file-ignores`` are removed, and
         only ``select`` patterns are kept (if specified).
+    cache_dir:
+        Directory for file-level cache.  Defaults to ``.smellcheck-cache``
+        relative to the first target's parent.  Set *use_cache* to ``False``
+        to disable.
+    use_cache:
+        When ``True`` (default), skip re-analysis of unchanged files.
     """
     all_findings: list[Finding] = []
     all_file_data: list[FileData] = []
     seen: set[Path] = set()
+
+    # Resolve cache directory
+    _cache: Path | None = None
+    _cfghash: str = ""
+    _version: str = ""
+    if use_cache:
+        if cache_dir is not None:
+            _cache = cache_dir
+        else:
+            # Default: .smellcheck-cache next to first target
+            anchor = targets[0] if targets else Path.cwd()
+            if anchor.is_file():
+                anchor = anchor.parent
+            _cache = anchor / _DEFAULT_CACHE_DIR
+        _cfghash = _config_hash(config)
+        try:
+            from smellcheck import __version__
+            _version = __version__
+        except Exception:
+            _version = "unknown"
 
     for target in targets:
         for py_file in _collect_py_files(target):
@@ -3101,10 +3335,32 @@ def scan_paths(
             if resolved in seen:
                 continue
             seen.add(resolved)
-            findings, fd = scan_file(py_file)
-            all_findings.extend(findings)
-            if fd:
-                all_file_data.append(fd)
+
+            # Try cache before expensive scan
+            if _cache is not None:
+                try:
+                    source = py_file.read_text(encoding="utf-8")
+                except (UnicodeDecodeError, PermissionError):
+                    continue
+                key = _cache_key(source, _cfghash, _version)
+                cached = _read_cache(_cache, key)
+                if cached is not None:
+                    findings, fd = cached
+                    # Update filepath in case of relocation
+                    all_findings.extend(findings)
+                    all_file_data.append(fd)
+                    continue
+                # Cache miss — scan and write
+                findings, fd = scan_file(py_file)
+                all_findings.extend(findings)
+                if fd:
+                    all_file_data.append(fd)
+                    _write_cache(_cache, key, findings, fd)
+            else:
+                findings, fd = scan_file(py_file)
+                all_findings.extend(findings)
+                if fd:
+                    all_file_data.append(fd)
 
     if len(all_file_data) > 1:
         all_findings.extend(cross_file_analysis(all_file_data))
@@ -3471,6 +3727,9 @@ _HELP_TEXT: Final = textwrap.dedent("""\
       --ignore CODES      Skip these checks (comma-separated, e.g. SC601,SC202)
       --scope SCOPE       Only show findings of this scope: file | cross_file | metric
       --explain [CODE]     Show rule docs: SC701, SC4 (family), or all
+      --no-cache          Disable file-level caching
+      --cache-dir PATH    Custom cache directory (default: .smellcheck-cache)
+      --clear-cache       Delete cached results and exit
       --generate-baseline Output a JSON baseline of current findings to stdout
       --baseline PATH     Compare against baseline; only report new findings
       --version           Show version and exit
@@ -3612,6 +3871,21 @@ def main():
             _explain("all")
         sys.exit(0)
 
+    # Extract cache flags before _parse_args (avoids path validation)
+    no_cache = "--no-cache" in raw_args
+    if no_cache:
+        raw_args.remove("--no-cache")
+    cache_dir_str = _pop_option(raw_args, "--cache-dir")
+    clear_cache = "--clear-cache" in raw_args
+    if clear_cache:
+        raw_args.remove("--clear-cache")
+
+    if clear_cache:
+        cdir = Path(cache_dir_str) if cache_dir_str else Path(_DEFAULT_CACHE_DIR)
+        removed = _clear_cache(cdir)
+        print(f"Cleared {removed} cached entries from {cdir}")
+        sys.exit(0)
+
     # Extract baseline flags before _parse_args (avoids path validation)
     generate_baseline = "--generate-baseline" in raw_args
     if generate_baseline:
@@ -3644,7 +3918,22 @@ def main():
     if baseline_path_str is None and not generate_baseline:
         baseline_path_str = config.get("baseline")
 
-    findings = scan_paths(paths, config=config)
+    # Resolve cache config (CLI overrides pyproject.toml)
+    use_cache = not no_cache
+    if use_cache and config.get("cache") is False:
+        use_cache = False
+    resolved_cache_dir: Path | None = None
+    if cache_dir_str:
+        resolved_cache_dir = Path(cache_dir_str)
+    elif config.get("cache-dir"):
+        resolved_cache_dir = Path(config["cache-dir"])
+
+    findings = scan_paths(
+        paths,
+        config=config,
+        cache_dir=resolved_cache_dir,
+        use_cache=use_cache,
+    )
 
     # Apply --scope filter
     if scope_filter is not None:
