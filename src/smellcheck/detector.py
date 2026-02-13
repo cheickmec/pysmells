@@ -3407,10 +3407,14 @@ def _explain(code: str) -> None:
         print(f"Suppress: # noqa: {code}")
         return
 
-    # --- Family prefix: SC4 → all SC4xx rules ---
+    # --- Family prefix: SC4 or SC4xx → all SC4xx rules ---
     upper = code.upper()
+    prefix = None
     if len(upper) == 3 and upper.startswith("SC") and upper[2].isdigit():
-        prefix = upper  # e.g. "SC4"
+        prefix = upper
+    elif len(upper) == 5 and upper.startswith("SC") and upper[2].isdigit() and upper[3:] == "XX":
+        prefix = upper[:3]
+    if prefix is not None:
         matched = {c: r for c, r in _RULE_REGISTRY.items() if c.startswith(prefix)}
         if not matched:
             print(f"No rules found with prefix {prefix}xx", file=sys.stderr)
@@ -3447,6 +3451,7 @@ def _explain(code: str) -> None:
 
 _HELP_TEXT: Final = textwrap.dedent("""\
     Usage: smellcheck <path> [path ...] [options]
+           smellcheck --explain [CODE]
 
     Scan Python files for code smells mapped to the 83-pattern refactoring catalog.
 

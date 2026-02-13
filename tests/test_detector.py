@@ -803,6 +803,14 @@ def test_explain_family():
     assert "SC407" in r.stdout
 
 
+def test_explain_family_xx_suffix():
+    """SC4xx form should work the same as SC4."""
+    r = _run_cli("--explain", "SC4xx")
+    assert r.returncode == 0
+    assert "Control Flow" in r.stdout
+    assert "SC401" in r.stdout
+
+
 def test_explain_all():
     r = _run_cli("--explain", "all")
     assert r.returncode == 0
