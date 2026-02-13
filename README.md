@@ -14,7 +14,7 @@
   <a href="https://pypi.org/project/smellcheck/"><img src="https://img.shields.io/pypi/pyversions/smellcheck" alt="Python"></a>
   <a href="https://github.com/cheickmec/smellcheck/actions/workflows/ci.yml"><img src="https://github.com/cheickmec/smellcheck/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://pypistats.org/packages/smellcheck"><img src="https://img.shields.io/pypi/dm/smellcheck" alt="Downloads"></a>
-  <a href="https://github.com/cheickmec/smellcheck#pre-commit"><img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit" alt="pre-commit"></a>
+  <a href="https://github.com/cheickmec/smellcheck/blob/main/docs/installation.md#pre-commit"><img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit" alt="pre-commit"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
   <a href="https://github.com/cheickmec/smellcheck/blob/main/LICENSE"><img src="https://img.shields.io/github/license/cheickmec/smellcheck" alt="License"></a>
 </p>
@@ -37,93 +37,9 @@ smellcheck myfile.py --format json
 smellcheck src/ --min-severity warning --fail-on warning
 ```
 
-### GitHub Action
+Also available as a **GitHub Action**, **pre-commit hook**, **SARIF/Code Scanning** integration, and **[Agent Skills](https://agentskills.io) plugin** for Claude Code, Cursor, Copilot, Gemini CLI, and more.
 
-```yaml
-- uses: cheickmec/smellcheck@v1
-  with:
-    paths: 'src/'
-    fail-on: 'error'       # exit 1 on error-level findings (default)
-    min-severity: 'info'   # display all findings (default)
-    format: 'github'       # GitHub annotations (default)
-```
-
-### pre-commit
-
-```yaml
-repos:
-  - repo: https://github.com/cheickmec/smellcheck
-    rev: v0.2.0
-    hooks:
-      - id: smellcheck
-        args: ['--fail-on', 'warning']
-```
-
-### Agent Skills (Claude Code, Codex CLI, Cursor, Copilot, Roo Code, Gemini CLI)
-
-A skill is a directory (`python-refactoring/`) containing `SKILL.md`, 8 reference files, and a detection script. Any tool supporting the [Agent Skills](https://agentskills.io) standard can install it.
-
-**Claude Code (native):**
-
-```bash
-/plugin marketplace add cheickmec/smellcheck
-/plugin install python-refactoring@smellcheck
-```
-
-**OpenAI Codex CLI (native):**
-
-```bash
-$skill-installer install cheickmec/smellcheck
-```
-
-**Gemini CLI (native):**
-
-```bash
-gemini skills install https://github.com/cheickmec/smellcheck.git \
-  --path plugins/python-refactoring/skills/python-refactoring
-```
-
-**Universal installer** (Claude Code, Cursor, Copilot, Codex, Gemini CLI, and more):
-
-```bash
-npx ai-agent-skills install cheickmec/smellcheck
-```
-
-**Manual install** (Cursor, VS Code/Copilot, Roo Code, Windsurf, or any Agent Skills tool):
-
-```bash
-# 1. Clone the repo
-git clone --depth 1 https://github.com/cheickmec/smellcheck.git /tmp/smellcheck
-
-# 2. Copy the skill directory into your tool's skills folder
-SKILL_SRC=/tmp/smellcheck/plugins/python-refactoring/skills/python-refactoring
-
-mkdir -p .cursor/skills && cp -r "$SKILL_SRC" .cursor/skills/      # Cursor
-mkdir -p .github/skills && cp -r "$SKILL_SRC" .github/skills/      # VS Code / Copilot
-mkdir -p .roo/skills && cp -r "$SKILL_SRC" .roo/skills/            # Roo Code
-mkdir -p .windsurf/skills && cp -r "$SKILL_SRC" .windsurf/skills/  # Windsurf
-mkdir -p .gemini/skills && cp -r "$SKILL_SRC" .gemini/skills/      # Gemini workspace
-
-# 3. Clean up
-rm -rf /tmp/smellcheck
-```
-
-### Tools without Agent Skills support
-
-For tools that only read flat markdown rule files, copy `SKILL.md` as a rule (the AI gets the smell catalog and can run the CLI, but won't have the reference files for refactoring guidance):
-
-```bash
-SKILL_URL=https://raw.githubusercontent.com/cheickmec/smellcheck/main/plugins/python-refactoring/skills/python-refactoring/SKILL.md
-
-# Continue.dev
-curl -fsSL "$SKILL_URL" -o .continue/rules/smellcheck.md
-
-# Amazon Q
-curl -fsSL "$SKILL_URL" -o .amazonq/rules/smellcheck.md
-
-# Aider (load at runtime, no install needed)
-aider --read /path/to/SKILL.md
-```
+**[Full installation guide →](https://github.com/cheickmec/smellcheck/blob/main/docs/installation.md)**
 
 ## Usage
 
@@ -219,33 +135,7 @@ Fingerprints are resilient to line-number changes — renaming or moving code ar
 - **Multiple output formats** -- text (terminal), JSON (machine-readable), GitHub annotations (CI), SARIF 2.1.0 (Code Scanning)
 - **Configurable** -- pyproject.toml config, inline suppression, CLI overrides
 - **Baseline support** -- adopt incrementally by suppressing existing findings and only failing on new ones
-- **Four distribution channels** -- pip, GitHub Action, pre-commit, Agent Skills
-
-## SARIF / Code Scanning
-
-Upload smellcheck findings to GitHub Code Scanning so they appear as native alerts in the Security tab and as PR annotations:
-
-```yaml
-# Add to your CI workflow
-code-scanning:
-  runs-on: ubuntu-latest
-  permissions:
-    security-events: write
-  steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-    - run: pip install smellcheck
-    - run: smellcheck src/ --format sarif --min-severity warning > results.sarif
-      continue-on-error: true
-    - uses: github/codeql-action/upload-sarif@v4
-      with:
-        sarif_file: results.sarif
-      if: always()
-```
-
-Results include stable fingerprints for deduplication across runs.
+- **Multiple distribution channels** -- pip, GitHub Action, pre-commit, Agent Skills ([full list](https://github.com/cheickmec/smellcheck/blob/main/docs/installation.md))
 
 ## Detected Patterns
 
@@ -336,24 +226,6 @@ Each pattern includes a description, before/after code examples, and trade-offs:
 | `hygiene.md` | Constants, dead code, comments, style (SC601, SC602, 011, SC606, SC401, 025, 031, 032, SC205, SC603, SC605) |
 | `idioms.md` | Context managers, generators, unpacking, async (SC701, SC702, SC703, 059, 060, SC304, SC305, SC604) |
 | `metrics.md` | OO metrics: cohesion, coupling, fan-out, response, delegation (SC801, SC802, SC803, SC804, SC805) |
-
-## Compatibility
-
-| Tool | Install Method | Status |
-|------|---------------|--------|
-| pip | `pip install smellcheck` | Native support |
-| GitHub Actions | `uses: cheickmec/smellcheck@v1` | Native support |
-| pre-commit | `.pre-commit-config.yaml` | Native support |
-| Claude Code | `/plugin marketplace add` | Native support |
-| OpenAI Codex CLI | `$skill-installer install` | Native support |
-| Cursor | Settings > Rules > Remote Rule | Native support |
-| GitHub Copilot | `.github/skills/` | Native support |
-| Roo Code | `.roo/skills/` | Native support |
-| Gemini CLI | `.gemini/skills/` | Native support |
-| Windsurf | `.windsurf/skills/` | Manual |
-| Continue.dev | `.continue/rules/` or Hub `uses:` | Manual |
-| Amazon Q | `.amazonq/rules/` | Manual |
-| Aider | `--read SKILL.md` | Manual |
 
 ## How It Compares
 
