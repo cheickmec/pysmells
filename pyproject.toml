@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "smellcheck"
-version = "0.3.2"
+version = "0.3.3"
 description = "Python code smell detector -- 83 refactoring patterns, 56 AST checks, zero dependencies"
 readme = "README.md"
 license = "MIT"

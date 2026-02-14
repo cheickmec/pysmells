@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3](https://github.com/cheickmec/smellcheck/compare/v0.3.2...v0.3.3) (2026-02-14)
+
+
+### Features
+
+* add block-level suppression comments ([ab263b8](https://github.com/cheickmec/smellcheck/commit/ab263b86c954a5c21e6c84f5aff009f7fb5e5148)), closes [#9](https://github.com/cheickmec/smellcheck/issues/9)
+* add diff-aware scanning (--diff / --changed-only) ([916ddcd](https://github.com/cheickmec/smellcheck/commit/916ddcd8afcedab0e9af9ddf81d6039ceb205379)), closes [#13](https://github.com/cheickmec/smellcheck/issues/13)
+* add file-level caching for faster repeated scans ([9305de6](https://github.com/cheickmec/smellcheck/commit/9305de6510a63d2f60fb40aa2da15a91be45488f)), closes [#8](https://github.com/cheickmec/smellcheck/issues/8)
+
+
+### Bug Fixes
+
+* add CI guard, error handling, and path dedup to vendor hook ([2cbc43a](https://github.com/cheickmec/smellcheck/commit/2cbc43a59ec3eb71a953937680ee36e01f7c5565))
+* correct cross-file cache test and clean up cache logic ([16e3be0](https://github.com/cheickmec/smellcheck/commit/16e3be0f5037c410b52a469894b89aad976f40cf))
+* harden cache key, eliminate double reads, skip cache dir ([6ea1638](https://github.com/cheickmec/smellcheck/commit/6ea16386f580619aaccd63cb5632092ac55a606c))
+* restore dual-file trigger for vendor-sync hook ([489c730](https://github.com/cheickmec/smellcheck/commit/489c730ee8d4b4a207f9b840c3912e49c2495c85))
+* skip empty lines in git diff output parsing ([58be4ce](https://github.com/cheickmec/smellcheck/commit/58be4ce5e6655a1b215502d3e3a3160cca0f175e))
+* tighten directive regex and add edge case tests ([0f442ae](https://github.com/cheickmec/smellcheck/commit/0f442aee222d67f46a7f143186484a9abf7b76fb))
+
+
+### Documentation
+
+* add --explain and caching examples to SKILL.md ([da4c3c5](https://github.com/cheickmec/smellcheck/commit/da4c3c5d48a65b943654d25355cfab36a4e6d9de))
+
+
+### Miscellaneous
+
+* auto-vendor on detector.py change instead of check-only ([4ba3f2e](https://github.com/cheickmec/smellcheck/commit/4ba3f2eb41aa6f1c3d43e0ff03fb8aceae0b5adf))
+
 ## [0.3.2](https://github.com/cheickmec/smellcheck/compare/v0.3.1...v0.3.2) (2026-02-13)
 
 
