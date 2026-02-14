@@ -894,7 +894,7 @@ def _noqa_suppressed(source_lines: list[str], line: int, pattern: str) -> bool:
 #          # smellcheck: disable-file SC301
 _DIRECTIVE_RE = re.compile(
     r"#\s*smellcheck\s*:\s*(disable-file|disable-all|enable-all|disable|enable)"
-    r"(?:\s+([A-Za-z0-9_,\s]+))?",
+    r"(?:\s+((?:[A-Za-z0-9_]+\s*,\s*)*[A-Za-z0-9_]+))?",
 )
 
 
@@ -937,6 +937,8 @@ def _parse_block_directives(
             continue
 
         if action == "disable-all":
+            # Any trailing codes are intentionally ignored — disable-all
+            # suppresses everything regardless.
             all_open_since = idx
             continue
 

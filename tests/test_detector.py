@@ -1343,6 +1343,52 @@ def test_parse_block_directives_disable_file_all():
     assert len(fdc) == 0
 
 
+def test_parse_block_directives_enable_all_without_disable_all():
+    """enable-all without prior disable-all is a no-op."""
+    lines = [
+        "# smellcheck: disable SC701",       # line 1
+        "def foo(x=[]):",                      # line 2
+        "# smellcheck: enable-all",           # line 3 — no disable-all active
+        "def bar(y=[]):",                      # line 4
+    ]
+    block_map, daf, fdc = _parse_block_directives(lines)
+    assert not daf
+    # SC701 range should extend to EOF (unterminated, not closed by enable-all)
+    assert "SC701" in block_map
+    start, end = block_map["SC701"][0]
+    assert start == 1 and end == 5  # total + 1
+
+
+def test_parse_block_directives_duplicate_disable():
+    """Double disable of same code is idempotent."""
+    lines = [
+        "# smellcheck: disable SC701",  # line 1
+        "# smellcheck: disable SC701",  # line 2 — redundant, ignored
+        "def foo(x=[]):",                # line 3
+        "# smellcheck: enable SC701",   # line 4
+    ]
+    block_map, daf, fdc = _parse_block_directives(lines)
+    assert "SC701" in block_map
+    # Only one range (first disable to the enable)
+    assert len(block_map["SC701"]) == 1
+    start, end = block_map["SC701"][0]
+    assert start == 1 and end == 4
+
+
+def test_block_disable_all_with_trailing_codes(tmp_path):
+    """disable-all with trailing codes ignores the codes (suppresses all)."""
+    _write_py(tmp_path, """\
+        # smellcheck: disable-all SC701
+        def foo(x=[]):
+            return x
+        MAGIC = 42
+        # smellcheck: enable-all
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    suppressed = [f for f in findings if f.line <= 5]
+    assert len(suppressed) == 0
+
+
 def test_explain_mentions_block_suppression(tmp_path):
     """--explain output includes block suppression syntax."""
     result = _run_cli("--explain", "SC701")
