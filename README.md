@@ -117,7 +117,9 @@ cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-c
 
 CLI flags override config values.
 
-## Inline Suppression
+## Suppression
+
+### Per-line
 
 Add `# noqa: SC701` to a line to suppress that check on that line:
 
@@ -127,6 +129,49 @@ def foo(x=[]):  # noqa: SC701
 ```
 
 Use `# noqa` (no codes) to suppress all findings on that line. Multiple codes: `# noqa: SC601,SC202`
+
+### Block-level
+
+Disable specific checks for a range of lines with `# smellcheck: disable` / `# smellcheck: enable`:
+
+```python
+# smellcheck: disable SC301, SC305
+class LegacyGodObject:
+    """This class is intentionally large for backward compatibility."""
+
+    def method_one(self):
+        self._temp = compute()  # SC305 suppressed by block directive
+
+    def method_two(self):
+        use(self._temp)
+# smellcheck: enable SC301, SC305
+```
+
+Disable all checks for a range:
+
+```python
+# smellcheck: disable-all
+# ... everything in this range is suppressed ...
+# smellcheck: enable-all
+```
+
+### File-level
+
+Suppress checks for an entire file (place at top of file):
+
+```python
+# smellcheck: disable-file SC301, SC305
+```
+
+Use `# smellcheck: disable-file` (no codes) to suppress all checks for the entire file.
+
+### Scope rules
+
+- `disable` / `enable` apply from that line to the matching `enable` (or end of file if no match)
+- `disable-all` / `enable-all` work the same way but for all checks at once
+- `disable-file` applies to the entire file
+- Per-line `# noqa` still works alongside block directives
+- Block directives do not affect cross-file findings (use `per-file-ignores` in config instead)
 
 ## Baseline
 

@@ -863,7 +863,7 @@ def _resolve_code(code: str) -> set[str]:
     return set()
 
 
-def _is_suppressed(source_lines: list[str], line: int, pattern: str) -> bool:
+def _noqa_suppressed(source_lines: list[str], line: int, pattern: str) -> bool:
     """Return True if *line* (1-based) has a ``# noqa`` that covers *pattern*.
 
     ``# noqa`` alone suppresses everything.
@@ -883,6 +883,145 @@ def _is_suppressed(source_lines: list[str], line: int, pattern: str) -> bool:
     for raw_code in codes_str.split(","):
         suppressed_patterns.update(_resolve_code(raw_code))
     return pattern in suppressed_patterns
+
+
+# ---------------------------------------------------------------------------
+# Block-level suppression (# smellcheck: disable/enable)
+# ---------------------------------------------------------------------------
+
+# Matches: # smellcheck: disable SC701, SC301
+#          # smellcheck: enable-all
+#          # smellcheck: disable-file SC301
+_DIRECTIVE_RE = re.compile(
+    r"#\s*smellcheck\s*:\s*(disable-file|disable-all|enable-all|disable|enable)"
+    r"(?:\s+([A-Za-z0-9_,\s]+))?",
+)
+
+
+def _parse_block_directives(
+    source_lines: list[str],
+) -> tuple[dict[str, list[tuple[int, int]]], bool, set[str]]:
+    """Parse ``# smellcheck:`` directives and build a suppression map.
+
+    Returns ``(block_map, disable_all_file, file_disabled_codes)`` where:
+
+    * *block_map* maps each SC code to a list of ``(start, end)`` 1-based
+      line ranges where the code is suppressed.
+    * *disable_all_file* is True when ``# smellcheck: disable-file`` (no
+      codes) appears — suppress every code for the entire file.
+    * *file_disabled_codes* is the set of SC codes suppressed for the
+      entire file via ``# smellcheck: disable-file SC...``.
+    """
+    total = len(source_lines)
+    # Currently open disable ranges: code -> start line (1-based)
+    open_ranges: dict[str, int] = {}
+    all_open_since: int | None = None  # line where disable-all started
+
+    block_map: dict[str, list[tuple[int, int]]] = {}
+    disable_all_file = False
+    file_disabled_codes: set[str] = set()
+
+    for idx, text in enumerate(source_lines, start=1):
+        m = _DIRECTIVE_RE.search(text)
+        if m is None:
+            continue
+        action = m.group(1)
+        codes_str = m.group(2)
+
+        if action == "disable-file":
+            if codes_str:
+                for raw in codes_str.split(","):
+                    file_disabled_codes.update(_resolve_code(raw))
+            else:
+                disable_all_file = True
+            continue
+
+        if action == "disable-all":
+            all_open_since = idx
+            continue
+
+        if action == "enable-all":
+            if all_open_since is not None:
+                # Close all individually-opened ranges too
+                for code, start in list(open_ranges.items()):
+                    block_map.setdefault(code, []).append((start, idx))
+                    del open_ranges[code]
+                # Record the disable-all range with sentinel key "*"
+                block_map.setdefault("*", []).append((all_open_since, idx))
+                all_open_since = None
+            continue
+
+        # disable / enable with specific codes
+        if not codes_str:
+            continue  # bare disable/enable without codes → ignore
+        resolved: set[str] = set()
+        for raw in codes_str.split(","):
+            resolved.update(_resolve_code(raw))
+
+        if action == "disable":
+            for code in resolved:
+                if code not in open_ranges:
+                    open_ranges[code] = idx
+        elif action == "enable":
+            for code in resolved:
+                if code in open_ranges:
+                    block_map.setdefault(code, []).append(
+                        (open_ranges.pop(code), idx)
+                    )
+
+    # Close any unterminated ranges at EOF
+    if all_open_since is not None:
+        block_map.setdefault("*", []).append((all_open_since, total + 1))
+        for code, start in open_ranges.items():
+            block_map.setdefault(code, []).append((start, total + 1))
+    else:
+        for code, start in open_ranges.items():
+            block_map.setdefault(code, []).append((start, total + 1))
+
+    return block_map, disable_all_file, file_disabled_codes
+
+
+def _is_suppressed(
+    source_lines: list[str],
+    line: int,
+    pattern: str,
+    block_map: dict[str, list[tuple[int, int]]] | None = None,
+    disable_all_file: bool = False,
+    file_disabled_codes: frozenset[str] | None = None,
+) -> bool:
+    """Return True if a finding at *line* for *pattern* should be suppressed.
+
+    Checks (in order):
+    1. Per-line ``# noqa`` (highest precedence)
+    2. File-wide ``# smellcheck: disable-file``
+    3. Block-level ``# smellcheck: disable/enable`` ranges
+    """
+    # 1. Per-line noqa always wins
+    if _noqa_suppressed(source_lines, line, pattern):
+        return True
+
+    # 2. File-wide suppression
+    if disable_all_file:
+        return True
+    if file_disabled_codes and pattern in file_disabled_codes:
+        return True
+
+    # 3. Block-level ranges (not applied to cross-file findings — those
+    #    are about whole-file/module structure, not individual lines)
+    if block_map:
+        rule = _RULE_REGISTRY.get(pattern)
+        if rule and rule.scope == "cross_file":
+            return False
+        # Check wildcard ranges (disable-all)
+        for start, end in block_map.get("*", ()):
+            if start <= line < end:
+                return True
+        # Check code-specific ranges
+        for start, end in block_map.get(pattern, ()):
+            if start <= line < end:
+                return True
+
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -3387,8 +3526,12 @@ def scan_paths(
         all_findings.extend(_detect_high_rfc(all_file_data))
         all_findings.extend(_detect_middle_man(all_file_data))
 
-    # --- Apply inline suppression ---
+    # --- Apply inline + block suppression ---
     source_cache: dict[str, list[str]] = {}
+    directive_cache: dict[
+        str,
+        tuple[dict[str, list[tuple[int, int]]], bool, frozenset[str]],
+    ] = {}
     filtered: list[Finding] = []
     for f in all_findings:
         if f.file not in source_cache:
@@ -3398,7 +3541,14 @@ def scan_paths(
                 )
             except Exception:
                 source_cache[f.file] = []
-        if not _is_suppressed(source_cache[f.file], f.line, f.pattern):
+        if f.file not in directive_cache:
+            bm, daf, fdc = _parse_block_directives(source_cache[f.file])
+            directive_cache[f.file] = (bm, daf, frozenset(fdc))
+        bm, daf, fdc = directive_cache[f.file]
+        if not _is_suppressed(
+            source_cache[f.file], f.line, f.pattern,
+            block_map=bm, disable_all_file=daf, file_disabled_codes=fdc,
+        ):
             filtered.append(f)
     all_findings = filtered
 
@@ -3677,7 +3827,10 @@ def _explain(code: str) -> None:
             print("  After:")
             print(textwrap.indent(after, "    "))
         print()
-        print(f"Suppress: # noqa: {code}")
+        print(f"Suppress:")
+        print(f"  Line:  # noqa: {code}")
+        print(f"  Block: # smellcheck: disable {code}  ...  # smellcheck: enable {code}")
+        print(f"  File:  # smellcheck: disable-file {code}")
         return
 
     # --- Family prefix: SC4 or SC4xx → all SC4xx rules ---
@@ -3756,9 +3909,11 @@ _HELP_TEXT: Final = textwrap.dedent("""\
       Each rule has an SC code (e.g. SC701). SC codes are used in --select,
       --ignore, and # noqa comments.
 
-    Inline suppression:
-      Add ``# noqa: SC701`` to suppress SC701 (mutable default args) on that line.
-      Use ``# noqa`` (no codes) to suppress all findings on that line.
+    Suppression:
+      Line:   ``# noqa: SC701`` suppresses SC701 on that line.
+      Block:  ``# smellcheck: disable SC701`` … ``# smellcheck: enable SC701``
+      File:   ``# smellcheck: disable-file SC701`` at top of file.
+      All:    ``# smellcheck: disable-all`` … ``# smellcheck: enable-all``
 
     Configuration:
       smellcheck reads [tool.smellcheck] from the nearest pyproject.toml.

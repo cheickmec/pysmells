@@ -22,7 +22,9 @@ from smellcheck.detector import (
     _deserialize_file_data,
     _deserialize_finding,
     _fingerprint,
+    _is_suppressed,
     _parse_args,
+    _parse_block_directives,
     _read_cache,
     _resolve_code,
     _serialize_file_data,
@@ -1064,3 +1066,287 @@ def test_corrupted_cache_treated_as_miss(tmp_path):
     # Scan should work fine, treating corrupted entry as miss
     findings = scan_paths([tmp_path], cache_dir=cache_dir, use_cache=True)
     assert any(f.pattern == "SC701" for f in findings)
+
+
+# ---------------------------------------------------------------------------
+# Block-level suppression tests
+# ---------------------------------------------------------------------------
+
+
+def test_block_disable_enable(tmp_path):
+    """# smellcheck: disable SC701 ... # smellcheck: enable SC701"""
+    _write_py(tmp_path, """\
+        # smellcheck: disable SC701
+        def foo(x=[]):
+            return x
+        # smellcheck: enable SC701
+
+        def bar(y=[]):
+            return y
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    sc701 = [f for f in findings if f.pattern == "SC701"]
+    # foo should be suppressed, bar should NOT be suppressed
+    assert len(sc701) == 1
+    assert "bar" in sc701[0].message or sc701[0].line > 5
+
+
+def test_block_disable_multiple_codes(tmp_path):
+    """# smellcheck: disable SC701, SC206 suppresses both codes."""
+    _write_py(tmp_path, """\
+        # smellcheck: disable SC701, SC206
+        def foo(a, b, c, d, e, f, g=[]):
+            return a
+        # smellcheck: enable SC701, SC206
+
+        def bar(a, b, c, d, e, f, g=[]):
+            return a
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    # foo should have no SC701 or SC206; bar should have both
+    suppressed_region = [f for f in findings if f.line <= 4]
+    unsuppressed_region = [f for f in findings if f.line > 5]
+    assert not any(f.pattern in ("SC701", "SC206") for f in suppressed_region)
+    assert any(f.pattern == "SC701" for f in unsuppressed_region)
+    assert any(f.pattern == "SC206" for f in unsuppressed_region)
+
+
+def test_block_enable_partial(tmp_path):
+    """enable SC701 re-enables only SC701; SC206 stays suppressed."""
+    _write_py(tmp_path, """\
+        # smellcheck: disable SC701, SC206
+        def foo(a, b, c, d, e, f, g=[]):
+            return a
+        # smellcheck: enable SC701
+
+        def bar(a, b, c, d, e, f, h=[]):
+            return a
+        # smellcheck: enable SC206
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    bar_findings = [f for f in findings if f.line >= 6 and f.line <= 8]
+    # bar should have SC701 (re-enabled) but NOT SC206 (still disabled)
+    assert any(f.pattern == "SC701" for f in bar_findings)
+    assert not any(f.pattern == "SC206" for f in bar_findings)
+
+
+def test_block_disable_all_enable_all(tmp_path):
+    """# smellcheck: disable-all suppresses everything."""
+    _write_py(tmp_path, """\
+        # smellcheck: disable-all
+        def foo(x=[]):
+            return x
+        # smellcheck: enable-all
+
+        def bar(y=[]):
+            return y
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    # foo region should have nothing; bar should have SC701
+    suppressed = [f for f in findings if f.line <= 4]
+    assert len(suppressed) == 0
+    assert any(f.pattern == "SC701" for f in findings if f.line > 5)
+
+
+def test_block_disable_file_specific_codes(tmp_path):
+    """# smellcheck: disable-file SC701 suppresses SC701 for entire file."""
+    _write_py(tmp_path, """\
+        # smellcheck: disable-file SC701
+
+        def foo(x=[]):
+            return x
+
+        def bar(y=[]):
+            return y
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    assert not any(f.pattern == "SC701" for f in findings)
+
+
+def test_block_disable_file_all(tmp_path):
+    """# smellcheck: disable-file (no codes) suppresses everything."""
+    _write_py(tmp_path, """\
+        # smellcheck: disable-file
+
+        def foo(x=[]):
+            return x
+        MAGIC = 42
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    assert len(findings) == 0
+
+
+def test_block_unterminated_disable(tmp_path):
+    """Unterminated disable applies to end of file."""
+    _write_py(tmp_path, """\
+        # smellcheck: disable SC701
+        def foo(x=[]):
+            return x
+
+        def bar(y=[]):
+            return y
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    # Both foo and bar SC701 should be suppressed (no enable before EOF)
+    assert not any(f.pattern == "SC701" for f in findings)
+
+
+def test_block_noqa_still_works_with_block(tmp_path):
+    """Per-line # noqa still works alongside block directives."""
+    _write_py(tmp_path, """\
+        def foo(x=[]):  # noqa: SC701
+            return x
+
+        def bar(y=[]):
+            return y
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    sc701 = [f for f in findings if f.pattern == "SC701"]
+    # foo suppressed by noqa, bar not suppressed
+    assert len(sc701) == 1
+    assert sc701[0].line > 3
+
+
+def test_block_unknown_codes_ignored(tmp_path):
+    """Unknown SC codes in directives don't crash."""
+    _write_py(tmp_path, """\
+        # smellcheck: disable SC999
+        def foo(x=[]):
+            return x
+        # smellcheck: enable SC999
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    # SC999 doesn't exist, so SC701 should still fire
+    assert any(f.pattern == "SC701" for f in findings)
+
+
+def test_block_case_insensitive(tmp_path):
+    """Directive codes are case-insensitive."""
+    _write_py(tmp_path, """\
+        # smellcheck: disable sc701
+        def foo(x=[]):
+            return x
+        # smellcheck: enable sc701
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    assert not any(f.pattern == "SC701" for f in findings)
+
+
+def test_block_whitespace_tolerance(tmp_path):
+    """Various whitespace patterns in directives are accepted."""
+    _write_py(tmp_path, """\
+        #smellcheck: disable SC701
+        def foo(x=[]):
+            return x
+        #  smellcheck:  enable  SC701
+
+        # smellcheck:disable SC701
+        def bar(y=[]):
+            return y
+        # smellcheck:enable SC701
+    """)
+    findings = scan_paths([tmp_path], use_cache=False)
+    assert not any(f.pattern == "SC701" for f in findings)
+
+
+def test_block_cross_file_not_affected(tmp_path):
+    """Block directives do NOT suppress cross-file findings."""
+    # Create two files that import each other (cyclic import = SC503)
+    a = tmp_path / "mod_a.py"
+    b = tmp_path / "mod_b.py"
+    a.write_text(
+        "# smellcheck: disable SC503\nimport mod_b\n# smellcheck: enable SC503\n",
+        encoding="utf-8",
+    )
+    b.write_text("import mod_a\n", encoding="utf-8")
+    findings = scan_paths([tmp_path], use_cache=False)
+    sc503 = [f for f in findings if f.pattern == "SC503"]
+    # SC503 is cross-file scope — block directives should NOT suppress it
+    assert len(sc503) > 0
+
+
+def test_block_disable_file_does_suppress_cross_file(tmp_path):
+    """disable-file DOES suppress cross-file findings (file-level intent)."""
+    a = tmp_path / "mod_a.py"
+    b = tmp_path / "mod_b.py"
+    a.write_text(
+        "# smellcheck: disable-file SC503\nimport mod_b\n",
+        encoding="utf-8",
+    )
+    b.write_text("import mod_a\n", encoding="utf-8")
+    findings = scan_paths([tmp_path], use_cache=False)
+    # SC503 reported on mod_a should be suppressed; mod_b's finding may remain
+    sc503_a = [f for f in findings if f.pattern == "SC503" and "mod_a" in f.file]
+    assert len(sc503_a) == 0
+
+
+def test_parse_block_directives_unit():
+    """Unit test for _parse_block_directives with known lines."""
+    lines = [
+        "# smellcheck: disable SC701",      # line 1
+        "def foo(x=[]):",                     # line 2
+        "    return x",                       # line 3
+        "# smellcheck: enable SC701",        # line 4
+        "def bar(y=[]):",                     # line 5
+    ]
+    block_map, daf, fdc = _parse_block_directives(lines)
+    assert not daf
+    assert len(fdc) == 0
+    assert "SC701" in block_map
+    ranges = block_map["SC701"]
+    assert len(ranges) == 1
+    start, end = ranges[0]
+    assert start == 1 and end == 4
+    # Line 2 is in range [1, 4)
+    assert start <= 2 < end
+    # Line 5 is NOT in range
+    assert not (start <= 5 < end)
+
+
+def test_parse_block_directives_disable_all():
+    """Unit test for disable-all / enable-all."""
+    lines = [
+        "# smellcheck: disable-all",  # line 1
+        "x = 42",                      # line 2
+        "# smellcheck: enable-all",   # line 3
+        "y = 99",                      # line 4
+    ]
+    block_map, daf, fdc = _parse_block_directives(lines)
+    assert not daf
+    assert "*" in block_map
+    start, end = block_map["*"][0]
+    assert start == 1 and end == 3
+
+
+def test_parse_block_directives_disable_file():
+    """Unit test for disable-file."""
+    lines = [
+        "# smellcheck: disable-file SC301, SC305",
+        "class Foo:",
+        "    pass",
+    ]
+    block_map, daf, fdc = _parse_block_directives(lines)
+    assert not daf
+    assert "SC301" in fdc
+    assert "SC305" in fdc
+
+
+def test_parse_block_directives_disable_file_all():
+    """Unit test for disable-file with no codes (suppress all)."""
+    lines = [
+        "# smellcheck: disable-file",
+        "class Foo:",
+        "    pass",
+    ]
+    block_map, daf, fdc = _parse_block_directives(lines)
+    assert daf is True
+    assert len(fdc) == 0
+
+
+def test_explain_mentions_block_suppression(tmp_path):
+    """--explain output includes block suppression syntax."""
+    result = _run_cli("--explain", "SC701")
+    assert result.returncode == 0
+    assert "smellcheck: disable" in result.stdout
+    assert "smellcheck: enable" in result.stdout
+    assert "smellcheck: disable-file" in result.stdout
