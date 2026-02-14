@@ -554,13 +554,23 @@ _CACHE_VERSION: Final = 1
 
 
 def _cache_key(source: str, config_hash: str, version: str) -> str:
-    """Cache key combining content hash, config hash, and tool version."""
-    content_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
-    return f"{content_hash}_{config_hash}_{version}"
+    """Cache key combining content hash, config hash, and tool version.
+
+    The compound key is hashed to guarantee a safe filename (hex only,
+    no path separators regardless of what *version* contains).
+    """
+    raw = f"{hashlib.sha256(source.encode('utf-8')).hexdigest()}_{config_hash}_{version}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _config_hash(config: dict | None) -> str:
-    """Deterministic hash of the config options that affect analysis."""
+    """Deterministic hash of the config options that affect analysis.
+
+    Only keys that change *which* checks run are included.  Keys like
+    ``min-severity``, ``fail-on``, ``format``, ``cache``, ``cache-dir``,
+    and ``baseline`` are post-filtering / output-only and do not affect
+    the per-file findings that get cached.
+    """
     if not config:
         return "noconfig"
     # Only hash keys that change which checks run or how they behave
@@ -2618,12 +2628,19 @@ class SmellDetector(ast.NodeVisitor):
 # ---------------------------------------------------------------------------
 
 
-def scan_file(filepath: Path) -> tuple[list[Finding], FileData | None]:
-    """Parse and scan a single Python file."""
-    try:
-        source = filepath.read_text(encoding="utf-8")
-    except (UnicodeDecodeError, PermissionError):
-        return [], None
+def scan_file(
+    filepath: Path, *, source: str | None = None,
+) -> tuple[list[Finding], FileData | None]:
+    """Parse and scan a single Python file.
+
+    When *source* is provided the file is not re-read from disk (used by
+    the caching layer which already read the content for hashing).
+    """
+    if source is None:
+        try:
+            source = filepath.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, PermissionError):
+            return [], None
     try:
         tree = ast.parse(source, filename=str(filepath))
     except SyntaxError:
@@ -3264,6 +3281,7 @@ _SKIP_DIRS: Final = frozenset(
         ".eggs",
         "node_modules",
         ".git",
+        ".smellcheck-cache",
     }
 )
 
@@ -3349,8 +3367,8 @@ def scan_paths(
                     all_findings.extend(findings)
                     all_file_data.append(fd)
                     continue
-                # Cache miss — scan and write
-                findings, fd = scan_file(py_file)
+                # Cache miss — scan (reuse already-read source) and write
+                findings, fd = scan_file(py_file, source=source)
                 all_findings.extend(findings)
                 if fd:
                     all_file_data.append(fd)

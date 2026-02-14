@@ -166,6 +166,8 @@ smellcheck src/ --cache-dir /tmp/sc-cache
 smellcheck --clear-cache
 ```
 
+Old cache entries are not automatically evicted. Run `smellcheck --clear-cache` periodically or after upgrading to reclaim disk space.
+
 Add `.smellcheck-cache/` to your `.gitignore`. You can also configure caching in `pyproject.toml`:
 
 ```toml
