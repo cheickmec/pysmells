@@ -115,6 +115,15 @@ Load **only** the file(s) matching detected smells:
 python3 scripts/detect_smells.py src/
 python3 scripts/detect_smells.py myfile.py --format json
 
+# Look up rule documentation (description + before/after example)
+python3 scripts/detect_smells.py --explain SC701
+python3 scripts/detect_smells.py --explain SC4    # list a family
+python3 scripts/detect_smells.py --explain all    # list all rules
+
+# Caching (enabled by default — skips unchanged files on repeat scans)
+python3 scripts/detect_smells.py src/ --no-cache       # fresh scan
+python3 scripts/detect_smells.py --clear-cache         # purge cache
+
 # Or use the pip-installed CLI directly
 pip install smellcheck
 smellcheck src/ --min-severity warning --fail-on warning
