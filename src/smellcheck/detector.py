@@ -3995,7 +3995,9 @@ def _get_changed_files(ref: str, paths: list[Path]) -> list[Path]:
     changed = []
     resolved_paths = [p.resolve() for p in paths]
     for line in result.stdout.strip().split("\n"):
-        fpath = (repo_root / line).resolve()
+        if not line.strip():
+            continue
+        fpath = (repo_root / line.strip()).resolve()
         if not fpath.exists():
             continue
         # Intersect with positional path args
